@@ -68,3 +68,5 @@ forever.
 - `for-ai/` update: yes/no and why.
 - Commit SHA, branch, remote sync, CI/deployment result.
 - Remaining blocker or next smallest product decision.
+
+The current repository-creation request authorizes the initial private GitHub publication. Later publication requires continuing matching authorization. Use codex/ branches for changes; never force-push.

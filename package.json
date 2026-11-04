@@ -1,0 +1,40 @@
+{
+  "name": "experiment-planner-ledger",
+  "version": "0.4.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "description": "Experiment Planner Ledger: local research experiment recipe authoring.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GeorgeFejer91/experiment-planner-ledger.git"
+  },
+  "homepage": "https://github.com/GeorgeFejer91/experiment-planner-ledger",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "surveyjs:build": "node scripts/build-surveyjs-vendor.js && node scripts/build-surveyjs-native.js",
+    "surveyjs:check": "node scripts/build-surveyjs-vendor.js --check && node scripts/build-surveyjs-native.js --check && node scripts/build-surveyjs-fixture.js --check",
+    "serve": "node scripts/serve-site.mjs",
+    "desktop:dev": "vite --config experiment-planner/desktop/vite.config.js",
+    "desktop:build": "vite build --config experiment-planner/desktop/vite.config.js && node scripts/verify-research-build.js desktop",
+    "desktop:preview": "vite preview --config experiment-planner/desktop/vite.config.js",
+    "build:pages": "node scripts/build-research-pages.js && node scripts/verify-research-build.js pages",
+    "planner:cli:build": "node scripts/build-planner-cli.js",
+    "desktop:ledger-icons": "node scripts/generate-planner-ledger-icons.js",
+    "qualification:browser:serve": "python -m http.server 8013 --bind 127.0.0.1 --directory ."
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/cli": "2.11.4",
+    "esbuild": "0.28.1",
+    "vite": "8.2.2"
+  },
+  "dependencies": {
+    "@chenglou/pretext": "0.0.9",
+    "dompurify": "3.4.15",
+    "survey-core": "3.0.4",
+    "survey-js-ui": "3.0.4"
+  }
+}

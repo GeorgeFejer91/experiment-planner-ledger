@@ -1,57 +1,63 @@
 # Project contract
 
-## Purpose
+## Purpose and product boundary
 
-Author local research experiment recipes with the Ledger interface, questionnaires, media sequences, layout and feedback settings.
+Experiment Planner Ledger helps researchers author local video-affect studies. Its sibling is
+[experiment-planner-classic](https://github.com/GeorgeFejer91/experiment-planner-classic). Both target the same authoring capabilities and
+versioned recipe semantics; their default interfaces differ.
 
-## Primary goal
+The Planner owns workspaces/media catalogues, questionnaires/languages,
+variants and named intervals, screen layout, feedback/input configuration,
+validation, save and editable reopen. Preview is an authoring simulation.
+Participant allocation, execution, sampling, actual timestamps, LSL/XDF and
+recording belong to a separate Runner. This repository ships no Runner app.
 
-Deliver the smallest usable result that satisfies the current user request and
-can be verified at its real output surface.
+## Architecture
 
-## Goal and session continuity
+- `experiment-planner/web/`: browser UI and shared pure authoring modules.
+- `experiment-planner/desktop/`: Tauri WebView frontend and Vite configuration.
+- `native/`: existing Rust crate, Planner executable and hidden authoring CLI.
+- `docs/`: versioned contracts, research provenance and dependency licences.
+- `test/`: synthetic authoring/contract fixtures and Node regression tests.
+- `scripts/`: Planner build and verification tools.
 
-Overall goal: the purpose above. Product acceptance criteria are **Undecided**
-until the first product task defines observable outcomes.
+The inherited native library still contains coupled Runner/session modules.
+They are implementation dependencies, not a delivered participant application
+or permission to add recording features. Prune only with contract/build evidence.
 
-Resume existing GSD `.planning/` state or the established project checklist.
-Until an execution workflow owns the state, use this small active checklist:
+## Scope and invariants
 
-- [ ] Define the first product outcome and its acceptance evidence.
-- [ ] Implement the agreed outcome and retain its verification result.
+Preserve historical recipe generations and questionnaire wording, codes,
+citations and licences. Never silently replace a researcher's setting or
+upgrade an opened recipe. Browser authoring has no native filesystem grants,
+global input, LSL/XDF or timing authority. Use HTML video; no retired native
+player stack. Optional spatial recipe fields do not establish XR device support.
+Private instrument installs and participant data remain researcher-local.
 
-Replace these bootstrap tasks with the agreed product tasks. Before a session
-ends, record the next concrete action, blockers, evidence, and last-observed
-branch/commit/publication state in the canonical task owner. Keep one active
-checklist and do not close the overall goal before its acceptance criteria pass.
+## Extraction task and acceptance
 
-## Non-goals
+Source: [Affect Research](https://github.com/GeorgeFejer91/affect-tracker-research/tree/25a429024ace0074119c2a44fb4e661670f0e84d).
+Interface: **ledger**. A source snapshot is preserved without copying the
+monorepo's Git history, participant results, bundled videos or Runner frontend.
+Related contracts remain available for compatibility, not additional app scope.
 
-- No speculative framework, service, abstraction, compatibility layer, or
-  deployment system.
-- No second implementation tree or duplicate source of truth.
-- No capability claim without matching evidence.
+- [x] Bootstrap a separate repository using the installed For-AI scaffold.
+- [x] Extract the actual ledger interface and matching authoring source.
+- [x] Verify shared domain parity with the sibling, tests and both frontend builds.
+- [ ] Publish privately with reciprocal documentation links and verify remote HEAD.
 
-Add project-specific non-goals only after they prevent a plausible wrong turn.
+Overall product readiness remains open: repository extraction is not an installed
+research-release qualification. Next action: verify private publication and CI, then qualify packaged Planner
+save/reopen and compare both interfaces with real media.
+Task state and evidence belong here; do not create a second progress ledger.
 
-## Product/control-plane boundary
+## Session observation
 
-- Product source and deliverables: outside `for-ai/`; exact roots are
-  **Undecided until the first deliverable selects them**.
-- Agent orchestration and durable project memory: `for-ai/`.
-- Local generated diagnostics and scratch evidence: `.for-ai-local/` (ignored).
-
-## Architecture and ownership
-
-The implementation stack, modules, external contracts, and deployment surface
-are currently **Undecided**. Once selected, record only the top-level ownership
-map here and route detailed protocols to task-specific files.
-
-## Current verified state
-
-- Fresh Git repository initialized on 2026-11-04.
-- AI control plane created and mechanically checked.
-- No product implementation has been scaffolded.
-
-Git and runnable checks are the authority for branch, revision, and behavior.
-Do not turn this section into a second status ledger.
+2026-11-04: local bootstrap on `codex/extract-planner`; remote publication pending.
+Extraction evidence: 1132 Node tests passed with zero failures/skips;
+SurveyJS checks, browser build, desktop frontend build, Rust formatting and
+locked native checks with all features and no default features passed. Headless
+Chrome at 1280x860 loaded the selected interface with seven sections, no startup
+errors and no participant Run panel. 66 shared authoring modules match the sibling
+byte-for-byte. Installer, actual native CLI execution, save/reopen against real
+media and the full visual/accessibility matrix remain NOT RUN. Read fresh Git state at the next session.

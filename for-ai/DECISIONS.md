@@ -1,31 +1,19 @@
-# Decision log
+# Decisions
 
-Record only durable choices whose rationale future agents would otherwise have
-to rediscover. Source and tests remain the authority for implementation facts.
+## 2026-11-04: Separate interface repositories — accepted
 
-## D-0001 — Minimal control plane before product scaffolding
+The user requested two focused GitHub repositories with matching authoring goals
+and capabilities, one Ledger and one Classic. This repository defaults to
+**ledger**; [experiment-planner-classic](https://github.com/GeorgeFejer91/experiment-planner-classic) is its counterpart.
+Both retain the established versioned recipe and owner contracts. Neither is
+the other's runtime dependency. Shared fixes require an explicit sibling check;
+do not imply ongoing automatic synchronization.
 
-- Date: 2026-11-04
-- Status: Accepted
-- Context: The project needs a predictable AI entrypoint without choosing an
-  application stack or inventing product structure prematurely.
-- Decision: Use a short root `AGENTS.md` that routes to a lowercase `for-ai/`
-  control plane. Keep product output outside that folder and add project files,
-  skills, and protocols only for current requirements.
-- Consequences: New agents get a reliable map and readiness gates. The first
-  product task must still choose the smallest suitable output structure.
-- Supersedes: None
+## 2026-11-04: Extraction and publication defaults — implementation choice
 
-## Record format
-
-For later decisions, add one compact entry with:
-
-- identifier and title;
-- date and status (`Proposed`, `Accepted`, `Superseded`, or `Rejected`);
-- context;
-- decision;
-- consequences;
-- supersession link when applicable.
-
-Do not rewrite accepted history to hide a changed direction. Add a superseding
-decision and link both entries.
+Use private repositories under GeorgeFejer91, the existing JavaScript/Tauri/Rust stack,
+new clean Git histories and exact source provenance. Keep source dependency
+versions unchanged. Preserve coupled native library modules while removing the
+Runner executable/frontend. Exclude bundled video bytes, local installs/results
+and historical suite packaging. Installer identities are separate by interface;
+packaging stays inactive until qualified. Original monorepo remains unchanged.

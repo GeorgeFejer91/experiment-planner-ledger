@@ -12,3 +12,15 @@ Thumbs.db
 *.swp
 *.tmp
 *.log
+
+node_modules/
+.pnpm-store/
+dist-pages/
+experiment-planner/desktop/dist/
+native/target/
+native/gen/schemas/
+coverage/
+*.log
+*.xdf
+*.xdf.partial
+experiment-planner/web/assets/research-stimuli/**/media/

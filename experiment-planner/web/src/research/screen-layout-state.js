@@ -1,0 +1,250 @@
+import { canonicalJson } from "./canonical.js";
+import { createScreenLayoutDraft, resolveScreenLayoutDraft } from "./screen-layout-draft.js";
+import { validateDesktopLayoutContribution, desktopLayoutDraftFromProfile, cloneDesktopLayoutDraft } from "./desktop-layout-contribution.js";
+import { DESKTOP_REFERENCE_POLICIES } from "./desktop-layout.js";
+
+export const SCREEN_LAYOUT_DRAFT_SCHEMA = "affect-research-screen-layout-draft";
+export const SCREEN_LAYOUT_DRAFT_VERSION = 2;
+const fields = Object.keys(createScreenLayoutDraft());
+const offsetFields = Object.freeze(fields.filter(field => !["feedbackX", "feedbackY"].includes(field)).concat(["offsetX", "offsetY"]));
+const legacyFields = offsetFields.filter(field => field !== "referencePolicy");
+const exact = (value, keys) => value && typeof value === "object" && !Array.isArray(value)
+  && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+const number = value => typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : NaN;
+function upgradeOffsetDraft(draft) {
+  const next = Object.fromEntries(fields.map(field => [field, draft[field] ?? createScreenLayoutDraft()[field]]));
+  next.referencePolicy = Object.hasOwn(draft, "referencePolicy") ? draft.referencePolicy : null;
+  const referenceX = number(draft.referenceX), referenceY = number(draft.referenceY);
+  const referenceWidth = number(draft.referenceWidth), referenceHeight = number(draft.referenceHeight);
+  const offsetX = number(draft.offsetX), offsetY = number(draft.offsetY);
+  if ([referenceX, referenceY, referenceWidth, referenceHeight, offsetX, offsetY].every(Number.isFinite)) {
+    next.feedbackX = draft.units === "mm" ? referenceX + offsetX : referenceX + offsetX * referenceWidth / 100;
+    next.feedbackY = draft.units === "mm" ? referenceY + offsetY : referenceY + offsetY * referenceHeight / 100;
+  }
+  return next;
+}
+function draftFieldsFor(document) {
+  if (document.version === 1) return legacyFields;
+  if (document.version !== SCREEN_LAYOUT_DRAFT_VERSION) return null;
+  return Object.hasOwn(document.draft ?? {}, "offsetX") || Object.hasOwn(document.draft ?? {}, "offsetY") ? offsetFields : fields;
+}
+
+/** Recoverable authoring state only. Never an accepted desktop layout contract. */
+export function validateScreenLayoutDraftDocument(value) {
+  const documentFields = exact(value, ["schema", "version", "draft"]) && value.schema === SCREEN_LAYOUT_DRAFT_SCHEMA
+    ? draftFieldsFor(value) : null;
+  if (!documentFields || !exact(value.draft, documentFields)) throw new TypeError("Unsupported or malformed screen layout draft.");
+  const draft = value.draft;
+  for (const field of documentFields) {
+    const raw = draft[field];
+    const valid = field === "units" ? ["relative", "mm"].includes(raw)
+      : field === "referencePolicy" ? raw === null || DESKTOP_REFERENCE_POLICIES.includes(raw)
+      : field === "fullViewportMapping" ? typeof raw === "boolean"
+        : (typeof raw === "string" && raw.length <= 128) || (typeof raw === "number" && Number.isFinite(raw));
+    if (!valid) throw new TypeError(`Invalid screen layout draft field: ${field}.`);
+  }
+  return structuredClone(value);
+}
+
+function normalizeDraftDocument(document) {
+  const validated = validateScreenLayoutDraftDocument(document);
+  return exact(validated.draft, fields) ? validated.draft : upgradeOffsetDraft(validated.draft);
+}
+
+export const validateScreenLayoutContribution = validateDesktopLayoutContribution;
+
+/** P4 alone owns draft revisions. Dependency receipts are derived, never restored. */
+export function createScreenLayoutState({ resolve = resolveScreenLayoutDraft, onChange = () => {},
+  prepareDraft = () => { throw new TypeError("Verified layout dependencies are required."); },
+  validateContribution = validateDesktopLayoutContribution } = {}) {
+  let draft = createScreenLayoutDraft();
+  let revision = 0;
+  let alive = true;
+  let operation = 0;
+  let contribution = null;
+  let projection = resolve(draft);
+  let dependencyIdentity = canonicalJson(projection.dependencyIdentity ?? null);
+  const snapshot = () => ({ revision, enabled: true, pending: contribution === null, contribution: structuredClone(contribution),
+    dependencyRevisions: structuredClone(projection.dependencyRevisions ?? []) });
+  function commit(next, nextProjection, force = false, restoredContribution = null) {
+    if (!alive) throw new Error("Screen layout editor has been destroyed.");
+    const identity = canonicalJson(nextProjection.dependencyIdentity ?? null);
+    const changed = force || canonicalJson(next) !== canonicalJson(draft) || identity !== dependencyIdentity;
+    if (changed && revision === Number.MAX_SAFE_INTEGER) throw new RangeError("Screen layout revision limit reached.");
+    draft = cloneDesktopLayoutDraft(next);
+    projection = nextProjection;
+    dependencyIdentity = identity;
+    if (changed) { revision += 1; operation += 1; contribution = structuredClone(restoredContribution); onChange(snapshot()); }
+    return snapshot();
+  }
+  function current(expectedRevision, expectedOperation, isCurrent) {
+    // Producer reads may synchronously publish an invalidation. Recheck the
+    // revision/generation after resolving, not before invoking those getters.
+    const identity = alive ? canonicalJson(resolve(draft).dependencyIdentity ?? null) : null;
+    if (!alive || revision !== expectedRevision || operation !== expectedOperation || isCurrent() !== true
+      || identity !== dependencyIdentity) {
+      throw new Error("Screen layout operation became stale.");
+    }
+  }
+  function prepared(value) {
+    if (canonicalJson(value) !== canonicalJson(contribution)) {
+      if (revision === Number.MAX_SAFE_INTEGER) throw new RangeError("Screen layout revision limit reached.");
+      contribution = structuredClone(value); revision += 1; onChange(snapshot());
+    }
+    return snapshot();
+  }
+  return Object.freeze({
+    get draft() { return cloneDesktopLayoutDraft(draft); },
+    get projection() { return structuredClone(projection); },
+    getSnapshot: snapshot,
+    getDraftDocument() { return { schema: SCREEN_LAYOUT_DRAFT_SCHEMA, version: SCREEN_LAYOUT_DRAFT_VERSION, draft: cloneDesktopLayoutDraft(draft) }; },
+    replaceDraft(next) {
+      next = normalizeDraftDocument({ schema: SCREEN_LAYOUT_DRAFT_SCHEMA, version: SCREEN_LAYOUT_DRAFT_VERSION, draft: next });
+      return commit(next, resolve(next));
+    },
+    async stageDraft(transform, { isCurrent, signal } = {}) {
+      if (typeof transform !== "function" || typeof isCurrent !== "function" || !signal) throw new TypeError("Layout staging requires its session lifetime.");
+      const expectedRevision = revision, expectedOperation = operation;
+      const expectedIdentity = dependencyIdentity;
+      const check = () => {
+        const identity = alive ? canonicalJson(resolve(draft, { observe: false }).dependencyIdentity ?? null) : null;
+        if (!alive || signal.aborted || !isCurrent() || revision !== expectedRevision
+          || operation !== expectedOperation || identity !== expectedIdentity) throw new Error("Screen layout staging became stale.");
+      };
+      check();
+      const next = normalizeDraftDocument({ schema: SCREEN_LAYOUT_DRAFT_SCHEMA, version: SCREEN_LAYOUT_DRAFT_VERSION,
+        draft: transform(cloneDesktopLayoutDraft(draft)) });
+      const nextProjection = structuredClone(resolve(next, { observe: false }));
+      const nextIdentity = canonicalJson(nextProjection.dependencyIdentity ?? null);
+      const changed = canonicalJson(next) !== canonicalJson(draft) || nextIdentity !== expectedIdentity;
+      if (changed && revision === Number.MAX_SAFE_INTEGER) throw new RangeError("Screen layout revision limit reached.");
+      await Promise.resolve();
+      check();
+      let consumed = false, published = false;
+      return Object.freeze({
+        isCurrent() { try { check(); return !consumed; } catch { return false; } },
+        commit() {
+          // Shared publication preflights every guard before committing any
+          // owner. All validation, cloning and geometry work is already done.
+          consumed = true;
+          if (changed) {
+            draft = next; projection = nextProjection; dependencyIdentity = nextIdentity;
+            revision += 1; operation += 1; contribution = null;
+          }
+        },
+        afterCommit() {
+          if (!consumed || published || !alive) return;
+          published = true;
+          // Another owner's post-commit publication may already have refreshed
+          // dependencies. Never notify consumers with the older staged receipt.
+          if (changed) onChange(snapshot());
+        },
+      });
+    },
+    refreshDependencies() { return commit(draft, resolve(draft)); },
+    async prepareRestoreContent(value, { contentDependencies, isCurrent = () => true } = {}) {
+      if (typeof isCurrent !== "function") throw new TypeError("Layout restoration requires a current-operation guard.");
+      const expectedRevision = revision, expectedOperation = operation, expectedIdentity = dependencyIdentity;
+      const check = () => {
+        const identity = alive ? canonicalJson(resolve(draft, { observe: false }).dependencyIdentity ?? null) : null;
+        if (!alive || !isCurrent() || revision !== expectedRevision || operation !== expectedOperation
+          || identity !== expectedIdentity) throw new Error("Screen layout content restoration became stale.");
+      };
+      check();
+      let validated;
+      try {
+        validated = await validateContribution(structuredClone(value), { contentDependencies: structuredClone(contentDependencies) });
+      } catch (error) { check(); throw error; }
+      check();
+      const next = desktopLayoutDraftFromProfile(validated);
+      const nextProjection = structuredClone(resolve(next, { observe: false }));
+      const nextIdentity = canonicalJson(nextProjection.dependencyIdentity ?? null);
+      check();
+      if (revision === Number.MAX_SAFE_INTEGER) throw new RangeError("Screen layout revision limit reached.");
+      let consumed = false, projected = false;
+      return Object.freeze({
+        isCurrent() { try { check(); return !consumed; } catch { return false; } },
+        commit() {
+          if (consumed) throw new Error("Screen layout content restoration was already committed.");
+          check();
+          consumed = true;
+          draft = next; projection = nextProjection; dependencyIdentity = nextIdentity;
+          revision += 1; operation += 1; contribution = null;
+        },
+        afterCommit() {
+          if (!consumed) throw new Error("Screen layout content restoration has not committed.");
+          if (projected) return;
+          if (!alive || !isCurrent() || revision !== expectedRevision + 1 || operation !== expectedOperation + 1)
+            throw new Error("Screen layout content projection became stale.");
+          projected = true;
+          onChange(snapshot());
+        },
+      });
+    },
+    async restoreDraft(document, { isCurrent = () => true } = {}) {
+      const next = normalizeDraftDocument(document);
+      const expectedRevision = revision;
+      const expectedOperation = ++operation;
+      // A restoration is a transaction; interleaved edits or teardown cancel it.
+      await Promise.resolve();
+      const nextProjection = resolve(next);
+      current(expectedRevision, expectedOperation, isCurrent);
+      return commit(next, nextProjection, true);
+    },
+    async prepareContribution({ isCurrent = () => true } = {}) {
+      const expectedRevision = revision, expectedOperation = ++operation;
+      let value;
+      try { value = await prepareDraft(cloneDesktopLayoutDraft(draft)); }
+      catch (error) { current(expectedRevision, expectedOperation, isCurrent); throw error; }
+      current(expectedRevision, expectedOperation, isCurrent);
+      return prepared(value);
+    },
+    async prepareConfirmation({ isCurrent, signal } = {}) {
+      if (typeof isCurrent !== "function" || !signal || typeof signal.aborted !== "boolean")
+        throw new TypeError("Layout confirmation requires its command lifetime and abort signal.");
+      const expectedRevision = revision, expectedOperation = operation, expectedIdentity = dependencyIdentity;
+      const check = () => {
+        const identity = alive ? canonicalJson(resolve(draft, { observe: false }).dependencyIdentity ?? null) : null;
+        if (!alive || signal.aborted || !isCurrent() || revision !== expectedRevision || operation !== expectedOperation
+          || identity !== expectedIdentity) throw new Error("Screen layout confirmation became stale.");
+      };
+      check();
+      let value;
+      try { value = structuredClone(await prepareDraft(cloneDesktopLayoutDraft(draft))); }
+      catch (error) { check(); throw error; }
+      check();
+      const changed = canonicalJson(value) !== canonicalJson(contribution);
+      if (changed && revision === Number.MAX_SAFE_INTEGER) throw new RangeError("Screen layout revision limit reached.");
+      const future = { revision: revision + (changed ? 1 : 0), enabled: true, pending: false,
+        contribution: value, dependencyRevisions: structuredClone(projection.dependencyRevisions ?? []) };
+      let consumed = false, projected = false;
+      return Object.freeze({
+        get snapshot() { return structuredClone(future); },
+        isCurrent() { try { check(); return !consumed; } catch { return false; } },
+        commit() {
+          if (consumed) throw new Error("Screen layout confirmation was already committed.");
+          check(); consumed = true;
+          contribution = value; revision = future.revision; operation += 1;
+        },
+        afterCommit() {
+          if (!consumed) throw new Error("Screen layout confirmation has not committed.");
+          if (projected) return;
+          if (!alive) throw new Error("Screen layout editor has been destroyed.");
+          projected = true;
+          if (changed) onChange(snapshot());
+        },
+      });
+    },
+    async restoreContribution(value, { isCurrent = () => true, contentOnly = false, ...dependencies } = {}) {
+      const expectedRevision = revision, expectedOperation = ++operation;
+      let validated;
+      try { validated = await validateContribution(structuredClone(value), dependencies); }
+      catch (error) { current(expectedRevision, expectedOperation, isCurrent); throw error; }
+      const next = desktopLayoutDraftFromProfile(validated);
+      const nextProjection = resolve(next);
+      current(expectedRevision, expectedOperation, isCurrent);
+      return commit(next, nextProjection, true, contentOnly ? null : validated);
+    },
+    destroy() { alive = false; operation += 1; contribution = null; },
+  });
+}

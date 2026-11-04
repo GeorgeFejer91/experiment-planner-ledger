@@ -1,59 +1,24 @@
-# experiment-planner-ledger agent control plane
+# Agent route
 
-Read this file first. It is a router, not the complete project manual.
+This repository owns **Experiment Planner Ledger**, a separate Planner application.
+Its sibling is [experiment-planner-classic](https://github.com/GeorgeFejer91/experiment-planner-classic). Both have the same authoring goals;
+the selected interface differs. Current source lives here, not in the sibling.
 
-## Purpose
+Read `PROJECT.md` for scope/current task state and `SKILLS.md` for required routes.
+Direct instructions outrank repository guidance. Git and fresh checks establish
+actual state; historical receipts establish only their original tested scope.
 
-`for-ai/` separates AI orchestration from product output. Store durable project
-context, skill routing, decisions, verification rules, and agent workflows
-here. Keep product source, shipped assets, end-user documentation, and final
-deliverables outside this directory.
-
-## Authority order
-
-1. System, developer, and current user instructions.
-2. Applicable law, safety, privacy, and external contracts.
-3. This repository's verified source, tests, schemas, and configuration.
-4. Current canonical documents in `for-ai/`.
-5. Historical decisions and external references.
-
-If authorities disagree, stop and surface the conflict. Do not silently choose
-the easiest interpretation.
-
-## Read by task
-
-| Need | Read |
+| Task | Read next |
 | --- | --- |
-| Scope, goals, boundaries, architecture, current state | [`PROJECT.md`](./PROJECT.md) |
-| Which installed skills apply and in what order | [`SKILLS.md`](./SKILLS.md) |
-| Acceptance criteria, commands, gates, evidence limits | [`VERIFICATION.md`](./VERIFICATION.md) |
-| Session loop, updates, Git publication, handoff | [`WORKFLOW.md`](./WORKFLOW.md) |
-| Why a durable choice was made or superseded | [`DECISIONS.md`](./DECISIONS.md) |
+| Goal, architecture, resume/handoff | [PROJECT.md](PROJECT.md) |
+| Skill choice | [SKILLS.md](SKILLS.md) |
+| Build, test, qualification | [VERIFICATION.md](VERIFICATION.md) |
+| Git/publication and session loop | [WORKFLOW.md](WORKFLOW.md) |
+| Product decisions and sibling relationship | [DECISIONS.md](DECISIONS.md) |
+| UI layout or text | [UI contract](../docs/ui-layout.md) |
+| Authoring commands and CLI | [CLI](../docs/planner-cli.md), [command API](../docs/planner-authoring-command-api-v1.md) |
+| Save/Open and recipe generations | [compatibility](../docs/compatibility.md), relevant `docs/planner-*.md` |
+| Questionnaires and licensing | [provenance](../docs/research-provenance.md), [assets](../docs/planner-questionnaire-assets.md) |
 
-Do not read every file by default. Read this router, then only what the current
-task touches.
-
-## Session loop
-
-Resume the durable project goal and active checklist first. Use the shared
-baseline in `SKILLS.md`; GSD owns active phase state when present. Before ending,
-leave evidence, blockers, and a concrete next action in that same state owner.
-
-1. Resolve the repository root and inspect Git status before changing anything.
-2. State the requested observable outcome and select the task-owned documents,
-   skills, and verification gates.
-3. Inspect the existing owner before adding code, files, dependencies, or
-   abstractions.
-4. Make the smallest complete change and preserve unrelated work.
-5. Run focused checks, then proportionate integration and publication gates.
-6. Update the narrowest canonical control-plane file when a durable fact
-   changed.
-7. Report evidence, limitations, commit/remote state, and any blocker.
-
-## New-project state
-
-Created: 2026-11-04
-Repository: Not created (-LocalOnly)
-Visibility at initialization: local-only
-
-No product stack or output tree is implied by this bootstrap.
+Product code, contracts, shipped assets and deliverables stay outside `for-ai/`.
+Keep this folder concise. Do not restore the monorepo's historical status ledgers.

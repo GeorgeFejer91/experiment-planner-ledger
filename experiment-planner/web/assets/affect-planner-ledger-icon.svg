@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Experiment Planner Ledger</title>
+  <desc id="description">A single angled ledger panel seen from the side, with a large four-color Flubber affect mark on its face.</desc>
+  <defs>
+    <path id="flubber-shape" d="M512 184C578 151 612 223 672 215C740 209 762 265 769 314C819 345 847 375 822 431C845 487 869 530 823 576C824 642 796 677 742 684C707 735 677 781 613 767C560 812 516 836 462 791C408 804 372 768 349 717C281 699 252 660 277 598C242 548 242 500 286 461C269 398 286 356 345 334C357 272 394 244 453 247C471 211 478 192 512 184Z"/>
+    <clipPath id="flubber-clip"><use href="#flubber-shape"/></clipPath>
+  </defs>
+
+  <rect x="32" y="32" width="960" height="960" rx="208" fill="#141827"/>
+  <path d="M248 227 666 166 704 154 825 739 787 751 365 835Z" fill="#65708a" stroke="#252a3b" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M248 227 666 166 787 751 365 835Z" fill="#f7f4eb" stroke="#252a3b" stroke-width="16" stroke-linejoin="round"/>
+
+  <g transform="matrix(0.5346 -0.0748 0.1138 0.6744 189 200)">
+    <g clip-path="url(#flubber-clip)">
+      <path d="M512 512 0 0H1024Z" fill="#f1c562"/>
+      <path d="M512 512 1024 0V1024Z" fill="#69d8ac"/>
+      <path d="M512 512 1024 1024H0Z" fill="#8096ef"/>
+      <path d="M512 512 0 1024V0Z" fill="#ef7d88"/>
+      <path d="M512 196V828M196 512H828" fill="none" stroke="#263048" stroke-width="26" stroke-linecap="round"/>
+    </g>
+    <use href="#flubber-shape" fill="none" stroke="#263048" stroke-width="16" stroke-linejoin="round"/>
+    <circle cx="512" cy="512" r="49" fill="#263048"/>
+    <circle cx="512" cy="512" r="19" fill="#f7f4eb"/>
+  </g>
+
+</svg>

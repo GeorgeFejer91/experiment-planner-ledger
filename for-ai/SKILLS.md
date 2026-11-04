@@ -56,6 +56,12 @@ fallback. Do not silently install or execute external instructions.
 
 ## Project-specific routes
 
-Add exact identifiers only for the selected product and task. Preserve the
-shared baseline. Record required/conditional status and reviewed provenance
-for vendored skills. Read selected instructions completely before acting.
+- Required for coding/review: `ponytail`; existing Rust/Tauri work also uses `tauri-rust-developer`.
+- HTML geometry uses `uncodixfy-pretext` and existing Pretext fitting; touched interaction uses `agents-inc-accessibility`.
+- Use `research-realtime-orchestration` from `.agents/skills/` only for versioned protocol/semantic-event contracts. Runner execution is out of scope.
+- For repository/instruction work use `for-ai`. No external skill install is implied.
+- Remote phone companions, MobX adoption and new app scaffolding are not extraction tasks.
+
+The shared baseline's `tauri-browser-remote-control` identifier is unavailable
+in this installation; no remote-control work is authorized. If it is requested,
+use the installed `browser-remote-sync-protocol` only after checking the scope.

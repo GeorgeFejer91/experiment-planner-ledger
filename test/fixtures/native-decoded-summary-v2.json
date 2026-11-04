@@ -1,0 +1,58 @@
+{
+  "workspaceFileId": "wf-aaaaaaaaaaaaaaaaaaaaaaaa",
+  "displayName": "clip.mp4",
+  "sha256": "ab63806e5069d264d4e0c877125c3705afd04156046bf122aa93a5de9e907dab",
+  "byteLength": 27,
+  "mimeType": "video/mp4",
+  "durationMs": 1000,
+  "decodeStatus": "attestedUnqualified",
+  "decodeBackend": "webviewVideoFrameCallback",
+  "decodeAttestation": "representativeFramesV1",
+  "decodedPositionsMs": [
+    100,
+    500,
+    900
+  ],
+  "displayGeometry": {
+    "status": "verified",
+    "source": "html-video-controlled-renderer",
+    "displayWidthPx": 1920,
+    "displayHeightPx": 1080,
+    "displayAspect": {
+      "numerator": 16,
+      "denominator": 9
+    },
+    "rotationDegrees": 0,
+    "pixelAspectRatio": {
+      "numerator": 1,
+      "denominator": 1
+    },
+    "metadataInterpretation": "html-video-element-intrinsic-dimensions",
+    "htmlVideoMetadata": {
+      "schema": "affect-research-html-video-display-metadata-receipt",
+      "version": 1,
+      "videoWidthPx": 1920,
+      "videoHeightPx": 1080,
+      "pixelAspectRatio": {
+        "numerator": 1,
+        "denominator": 1
+      },
+      "sourceOrientation": {
+        "media": {
+          "status": "absent"
+        },
+        "stream": {
+          "status": "absent"
+        }
+      }
+    }
+  },
+  "source": {
+    "kind": "workspaceFile",
+    "relativePath": "stimuli/clip.mp4",
+    "mimeType": "video/mp4",
+    "sha256": "ab63806e5069d264d4e0c877125c3705afd04156046bf122aa93a5de9e907dab",
+    "byteLength": 27,
+    "durationMs": 1000
+  }
+}

@@ -1,0 +1,245 @@
+> Extracted reference from Affect Research. Dated task allocations, Git history
+> and receipts refer to the source monorepo. Current scope and authorization are
+> governed by [this project contract](../for-ai/PROJECT.md); Runner execution is
+> outside this repository. Preserved requirements are not fresh qualification.
+
+# Final release validation — 2026-09-13
+
+Root is the sole release owner. Delegation has stopped. Work continues on
+`codex/final-release-validation` in the transferred `affect-tracker-research-master-v3`
+worktree; canonical and the former integration worktree have not been promoted.
+
+| Gate | Result |
+| --- | --- |
+| Production CLI authors the mock from an empty workspace | Pass: 55/55 steps, revision 0 → 40, process exit 0 |
+| Timestamped save, reopen, edit and second save | Pass: both files validated; first file preserved |
+| JSON content and compact serialization | Pass: 77,746 bytes, P1–P6, six unique questionnaire definitions, one video declaration |
+| Runner native/browser interpretation of that exact JSON | Pass: both English and German selections agree |
+| Reconstructed screen geometry and maximum Flubber fit | Pass in software; actual combined native screenshot remains open |
+| Actual full Runner execution and XDF-only reconstruction | Not completed; qualified native Start remains disabled |
+| Installed/research release | Not ready |
+
+## Saved experiment
+
+Local workspace: `D:/GitHub/.affect-checks/root-release-fullmock-workspace-06`.
+The JSON refers to the accompanying `assets/stimuli` directory; video bytes are
+not embedded. Questionnaire definitions are embedded once per language/version.
+Keep these locally authorized questionnaire assets out of public distribution.
+
+- Primary file: `mock-dictator-recipe_2026-09-12_22-24-47-638Z.json`.
+  SHA256 `11fa8b348b6853c98a6d3ff1430ab991ac22fbd0ad64a6c007111dedac8cc451`.
+- Edited copy: `mock-dictator-recipe_2026-09-12_22-25-09-511Z.json`.
+  SHA256 `37039a708e17d7ad87c04e8c8be72d06116b6ebfd6ecf45a329b53d679ae316b`.
+  Participant count changes from one to two; other authored content is preserved.
+- Each selected route contains demographics, MAIA-2, TAS-20, ISI1 (1750 ms),
+  `dictator-3-study.mp4` (native catalogue duration 254406 ms), ISI2 (3213 ms).
+- At the saved 1920×1080 viewport, video bounds are (384,54), 1152×648.
+  Flubber centre is (960,864), viewport side 77.76 px (12% of reference height).
+  Its conservative maximum animated side is 283.6944 px; fitted minimum separation
+  is 20.1528 px, exceeding the requested 19.44 px. Physical placement is unmeasured.
+
+JSON segment value sizes: P1 1779, P2 70777, P3 1367, P4 607, P5 1767,
+P6 21 bytes. The master contains authored settings and integrity data, without
+serialized Runner selection/layout projections or embedded video data.
+
+## Evidence
+
+Production source: `a1d91106311060fdd371c0df31b1cc7e72aab82a`.
+Frozen CLI SHA256 `881f4e680851a0760c134df52367ffb88ae059c5a79fdcd23e49299d9604ad21`.
+It used its pinned bundled runtime bin on process PATH; that is not installed
+loader qualification. The successful process completed native cleanup in 21 ms
+after requesting shutdown. Earlier failures remain retained.
+
+Under `D:/GitHub/.affect-checks/`:
+
+- `root-release-fullmock-evidence-06/mock-authoring-review.json` binds actual
+  commands, source assets, saves and final owner settings. Transcript SHA256
+  `a8285c953acadc2be9bc71d5f68e0524c88781f23e65b9af08915c2d54d09a90`.
+- `root-release-runner-intake-01/receipt.json` binds the production native reader
+  and both browser/native selections. It proves content correspondence only.
+- `root-release-json-content-review.json` checks exact source bytes, compactness,
+  asset location/size, six-step route and reconstructed layout.
+
+## Next gate: native Runner execution
+
+Do not repeat the passed Planner scenario or broad suites without a relevant
+change. Use this primary JSON for subsequent Runner work.
+
+1. Resolve and verify pre-main DLL loading for an installed application. The
+   executable currently fails to start without a prepared runtime search path.
+2. Resolve the observed cold-start/shutdown failure, then complete native playback
+   qualification. Increasing the startup sub-budget from 60 to 90 seconds within
+   the unchanged 120-second command limit is not proof of lifecycle closure.
+   `root-release-fullmock-evidence-05` preserves the timed-out, force-terminated case.
+3. Execute the exact saved experiment, capture actual native video + Flubber,
+   record real LSL/XDF and apply the independent XDF reader. Establish observed
+   event timing and neutral-before-ISI evidence. Existing flags stay false until
+   their stated gates are satisfied; no alternative production Start was added.
+
+Source: `research_native_media.rs` retains false native-player qualification
+flags; `research_runner_master/runtime.rs` records observed HTML-video playback
+without claiming physical onset. Redistribution/source closure and physical timing remain release gates.
+FFmpeg sequence synthesis is still an assessed option, not an implemented feature.
+
+## Runner previous-file shortcut — 2026-09-13
+
+Implemented R1/RR-01 **Load previous experiment** beside the existing file picker.
+A native Runner app-data bookmark survives restarts; it is committed only after
+frontend acceptance of the exact native source hash. Reload reads current disk
+contents, including edits, through existing validation. Cancelled/invalid new
+loads preserve the bookmark. Missing files give a picker recovery message.
+Controls lock while loading, running or recording; reload never starts execution.
+The master JSON remains unchanged.
+
+- Native library compiled; three real-file persistence tests passed. Diagnostic
+  copy-only manifest receipt: `D:/GitHub/.affect-checks/runner-recent-tests-01/`.
+- `scripts/qualification/runner-recent-ui.mjs`: 17 assertions at each of 1280px
+  and 520px widths passed, using the production frontend with synthetic native
+  transport. Both screenshots inspected: `runner-recent-ui-02/desktop.png` and
+  `runner-recent-ui-02/narrow.png` under the same evidence root.
+- `npm run runner:build` passed production bundling and Runner boundary checks.
+
+This is component and frontend evidence. The installed desktop executable has
+not been rebuilt/qualified for this shortcut; all preceding native execution,
+packaging, physical timing and real XDF gates remain open.
+
+## Retired native-player correction — 2026-09-14
+
+The previous native-enabled Runner build path has been superseded. Runner video
+execution now uses the lightweight HTML-compatible video surface and
+`research-media` URLs; the removed native player stack/HTML video feature, runtime gate, and bundled
+SDK instructions are retired and must not be used as release evidence.
+
+Nine focused Runner reader/master tests passed in the historical slice. All
+eight English/German production-app questionnaire cases passed (350 assertions),
+using synthetic native replies. Evidence:
+`runner-current-questionnaire-ui-01/receipt.json` under the same checks root.
+Includes typed demographics, Likert presentation, answer validation/drafts/
+submission, transitions and disposal; does not prove installed package, actual
+video timing, or real XDF execution. Current build includes the previous-file
+button and questionnaire module.
+
+## Runner readiness refresh — 2026-09-13
+
+R1/RR-01/RR-02: Continue previously reused the launch-time native media
+capability. Because native initialization is asynchronous, a pending snapshot
+could falsely report that video support was absent indefinitely. Both master
+and legacy checks now request current native capability after their media scan,
+reject stale/disposed UI revisions, distinguish startup pending from failure,
+and retain the native failure reason. No Start qualification gate was relaxed.
+
+The production-app en-flow scenario passes 77 assertions with native capability
+pending at boot and ready on the next request. Runner build/boundary checks pass.
+Evidence: `D:/GitHub/.affect-checks/runner-readiness-refresh-ui-01/receipt.json`.
+This fixes stale frontend state; actual native startup success remains a separate
+claim and is not inferred from the synthetic transport test.
+
+## Keyboard, recipe-root loading and current roadmap — 2026-09-13
+
+Added production questionnaire keyboard handling: choices use arrows/Home/End,
+Enter commits and advances after native acknowledgement, typed fields retain
+normal typing and Shift+Enter newlines, and final Submit remains explicit.
+EN/DE production-frontend scenarios each pass 85 assertions with synthetic native
+transport; a retained mouse-flow regression also passes. Native-enabled Windows
+build succeeds, as do three native bookmark/root tests. These are separate from
+full installed keyboard and XDF qualification.
+
+Picker/previous-file loading now selects the loaded JSON parent as the project
+root under native idle authority and returns its workspace receipt. GUI default
+projects share the Planner's root for convenience; exact JSON loading does not
+depend on it. The portable copy in `D:/Downloads/Mock Dictator Experiment/` has
+the unchanged JSON and exact declared video in `assets/stimuli/`.
+
+The agent-only `scripts/runner_keyboard_smoke.py` uses real PyAutoGUI keys and
+read-only UI Automation checks; it is absent from app dependency/package inputs.
+Its non-interactive `--preflight-only` mode now accepts the exact master6
+full-attempt qualification profile and verifies every declared media and
+questionnaire file against its saved byte length and SHA-256 before any
+foreground interaction. The master6 interactive route is explicitly separate
+from the historical master3 questionnaire sequence and permanently selects
+local validation mode.
+Live attempts proved loading/observability but stopped on a test participant
+selection gap (corrected) and foreground changes. No complete questionnaire run,
+actual playback or XDF claim. The active owner/metadata/checklist authority is
+`for-ai/65-RUNNER-SEGMENTS.md`. Production Start qualification and the
+requested separation of questionnaire presentation from video preparation are
+still open. Do not label the current native-enabled development build a final
+research-qualified release.
+
+## Opt-in master6 XDF transport qualification — 2026-09-22
+
+Commit `3212b1d` adds a bounded ignored test for a real Planner-authored master6
+source tree. Use a fresh XDF destination; the recorder does not overwrite:
+
+```powershell
+$env:AFFECT_RUNNER_MASTER6_SOURCE = '<exact-master6-manifest.json>'
+$env:AFFECT_RUNNER_MASTER6_XDF_FIXTURE = '<new-master6-output.xdf>'
+.\scripts\qualification\native-tests.ps1 `
+  -FeatureSet all-features `
+  -TestFilter 'research_runner_master::lsl::tests::actual_master6_outlets_record_reconstructable_synthetic_session' `
+  -IncludeIgnored
+python .\scripts\qualification\runner-information-xdf.py `
+  $env:AFFECT_RUNNER_MASTER6_XDF_FIXTURE '<new-independent-export.json>'
+node .\scripts\qualification\runner-information-stream.mjs `
+  '<new-independent-export.json>' '<new-reconstruction.json>'
+```
+
+The retained 2026-09-22 run used Planner source SHA-256
+`68f9bc828b5b69d687e2e8790ab512a5470295213a7cdffb4d356eef333b124e`.
+The 79,615-byte XDF SHA-256 is
+`62f918815040ab40964afaec6d356bcb140bc119e7e705bb34d9a53f8aa3b9e0`;
+its independent export and reconstruction hashes are respectively
+`db8cda4aec41d2dad0e1f706f40bd6912721bcd8899c055b5c53551bb8b8be12`
+and `fdb2f3f9d34dc866fa087e14377f3b84d448cd9ea5f5c98d154754b4f381d1de`.
+Both XDF footers verified. XDF alone reconstructed master6/policy-v2/fullAttempt,
+enabled LSL metadata, six ordered occurrences, three SurveyJS response records,
+four questionnaire assets, six exact eight-channel Affect rows and a complete
+outcome. A copy missing its final 64 bytes was rejected without producing an
+export.
+
+This is deliberately synthetic transport and reconstruction evidence. Six
+sparse rows cannot establish authored 130-Hz cadence; there was no installed
+foreground session, physical input, displayed-video observation, clean-profile
+host or offline adapter condition. Those release gates remain open.
+
+## Opt-in production master6 worker qualification — 2026-09-22
+
+Commit `0212d64` adds a production-worker route. The selected root must already
+exist and be empty, and the XDF must be a new direct child:
+
+```powershell
+$env:AFFECT_RUNNER_MASTER6_SOURCE = '<exact-master6-manifest.json>'
+$env:AFFECT_RUNNER_MASTER6_WORKER_ROOT = '<existing-empty-directory>'
+$env:AFFECT_RUNNER_MASTER6_WORKER_XDF = `
+  Join-Path $env:AFFECT_RUNNER_MASTER6_WORKER_ROOT 'master6-worker.xdf'
+.\scripts\qualification\native-tests.ps1 `
+  -FeatureSet all-features `
+  -TestFilter 'research_runner_master::worker::tests::actual_master6_worker_records_dense_full_attempt_evidence' `
+  -IncludeIgnored
+python .\scripts\qualification\runner-information-xdf.py `
+  $env:AFFECT_RUNNER_MASTER6_WORKER_XDF '<new-independent-export.json>'
+node .\scripts\qualification\runner-information-stream.mjs `
+  '<new-independent-export.json>' '<new-reconstruction.json>'
+```
+
+The retained clean-commit run used source SHA-256
+`68f9bc828b5b69d687e2e8790ab512a5470295213a7cdffb4d356eef333b124e`.
+The 1,994,751-byte XDF SHA-256 is
+`3bc5a81af886d1f60b7feea4bc50888abb528132d51d44d2af4d21929bc52f82`;
+the independent export and reconstruction hashes are respectively
+`461c878041a498b9036f35b60a5c593880deaff94fbe8a81dcfdbca8d5a4b3bd`
+and `907c67420d6566b07ce3a3a2b00ebd82311f59a781b970de3b53cd0d9de9d9bd`.
+Both footers verified. XDF alone reconstructed six ordered occurrences, three
+responses, 2,853 eight-channel Affect rows, 2,271 information frames and the
+completed outcome with no issues. Removing the final 64 bytes was rejected and
+created no export.
+
+The playing phase contained 1,284 rows over 9,937.267 ms: observed mean
+129.110 Hz against authored 130 Hz, median delta 7.689 ms, maximum delta
+21.151 ms and 18 explicit missed slots. Across the entire 27.889-second Affect
+span, observed mean was 102.261 Hz and 776 slots were explicitly missed; 740 of
+those occurred during CPU-heavy questionnaire or media-verification phases in
+this unoptimized test build. This is local-validation evidence with synthetic
+HTML-video callbacks and input edges. It does not establish installed foreground
+behavior, physical input, displayed-video onset/end, clean-profile startup or
+offline operation.

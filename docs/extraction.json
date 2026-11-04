@@ -1,0 +1,17 @@
+{
+  "sourceRepository": "https://github.com/GeorgeFejer91/affect-tracker-research",
+  "sourceCommit": "25a429024ace0074119c2a44fb4e661670f0e84d",
+  "interface": "ledger",
+  "extractedDate": "2026-11-04",
+  "siblingRepository": "https://github.com/GeorgeFejer91/experiment-planner-classic",
+  "trackedSourceFilesCopied": 645,
+  "excluded": [
+    "Runner frontend and executable",
+    "VLC and remote recorder apps",
+    "bundled stimulus media bytes",
+    "historical suite installers and CI/deployment",
+    "Git history and local untracked files"
+  ],
+  "qualification": "source extraction; independent native/runtime/release qualification remains open",
+  "matchingSharedAuthoringModules": 66
+}

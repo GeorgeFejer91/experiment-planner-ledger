@@ -1,0 +1,903 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+import {
+  ATTEMPT_DISPOSITIONS,
+  INPUT_PRESET_OPTIONS,
+  MAPPING_FIELDS,
+  RESEARCH_MODES,
+  RESEARCH_UI_EVENTS,
+  SETUP_SECTIONS,
+  nextOpenSetupSection,
+  normalizeResearchMode,
+  normalizeAttemptDisposition,
+  normalizeSetupSection,
+  renderResearchUiMarkup,
+} from "../experiment-planner/web/src/research/app.js";
+import {
+  DEFAULT_COLORS,
+  formatCoordinate,
+  normalizePreviewState,
+} from "../experiment-planner/web/src/research/preview.js";
+import {
+  SETUP_ACCORDION_MOTION_MS,
+  SETUP_ACCORDION_MOTION_QUERY,
+} from "../experiment-planner/web/src/research/setup-accordion-motion.js";
+import {
+  affectPaletteColor,
+  buildFlubberPath,
+  createProfiles,
+  createProjectionOffsets,
+} from "../experiment-planner/web/src/math.js";
+
+const root = new URL("../", import.meta.url);
+const read = (path) => readFile(new URL(path, root), "utf8");
+
+const expectedSections = [
+  ["workspace", "Workspace & Libraries"],
+  ["questionnaires", "Languages & Study Assets"],
+  ["stimuli", "Stimulus Presentation Order"],
+  ["layout", "Screen & Layout"],
+  ["feedback", "Flubber & Controls"],
+  ["xr", "VR screen layout"],
+  ["review", "Review & Export"],
+];
+
+test("the active instrument exposes exactly Setup and Run modes", () => {
+  assert.deepEqual(RESEARCH_MODES, ["setup", "run"]);
+  const markup = renderResearchUiMarkup("browser");
+  assert.equal((markup.match(/data-mode-panel=/gu) ?? []).length, 2);
+  assert.match(markup, /data-mode-panel="setup"[^>]*aria-label="Setting Up the Experiment"/u);
+  assert.match(markup, /data-mode-panel="run"[^>]*aria-label="Running the Experiment"/u);
+  assert.equal(normalizeResearchMode("run"), "run");
+  assert.equal(normalizeResearchMode("unknown"), "setup");
+});
+
+test("Setup presents the seven owners as an ordered ledger deck", () => {
+  assert.deepEqual(SETUP_SECTIONS.map(({ id, label }) => [id, label]), expectedSections);
+  const markup = renderResearchUiMarkup("browser", "ledger");
+  assert.equal((markup.match(/class="setup-accordion ledger-page"/gu) ?? []).length, expectedSections.length);
+  assert.equal((markup.match(/class="setup-accordion-trigger ledger-tab"/gu) ?? []).length, expectedSections.length);
+  assert.equal((markup.match(/class="ledger-tab-icon"/gu) ?? []).length, expectedSections.length);
+  assert.ok(markup.includes("7 ledger layers"));
+  let cursor = -1;
+  for (const [id, label] of expectedSections) {
+    const next = markup.indexOf(`id="setup-trigger-${id}"`);
+    assert.ok(next > cursor, `${label} must retain protocol order`);
+    assert.match(markup, new RegExp(`aria-controls="setup-panel-${id}"`, "u"));
+    assert.match(markup, new RegExp(`aria-labelledby="setup-trigger-${id}"`, "u"));
+    assert.match(markup, new RegExp(`ledger-tab-icons\\.svg\\?no-inline#ledger-${id}`, "u"));
+    cursor = next;
+  }
+  assert.equal((markup.match(/aria-expanded="true"/gu) ?? []).length, 1);
+  assert.equal(normalizeSetupSection("feedback"), "feedback");
+  assert.equal(normalizeSetupSection("nope"), "workspace");
+  assert.equal(nextOpenSetupSection("workspace", "review"), "review");
+  assert.equal(nextOpenSetupSection("workspace", "workspace"), "workspace");
+  assert.equal(nextOpenSetupSection("review", "nope"), "workspace");
+});
+
+test("Setup accordion panels animate open and closed without weakening semantics", async () => {
+  const markup = renderResearchUiMarkup("browser", "ledger");
+  const [source, motionSource, css] = await Promise.all([
+    read("experiment-planner/web/src/research/app.js"),
+    read("experiment-planner/web/src/research/setup-accordion-motion.js"),
+    read("experiment-planner/web/research.css"),
+  ]);
+
+  assert.ok(Number.isFinite(SETUP_ACCORDION_MOTION_MS));
+  assert.ok(SETUP_ACCORDION_MOTION_MS > 0 && SETUP_ACCORDION_MOTION_MS <= 300);
+  assert.equal(SETUP_ACCORDION_MOTION_QUERY, "(prefers-reduced-motion: reduce)");
+  assert.equal((markup.match(/data-motion-state="open"/gu) ?? []).length, 1);
+  assert.equal((markup.match(/data-motion-state="closed"/gu) ?? []).length, expectedSections.length - 1);
+  assert.equal((markup.match(/hidden inert/gu) ?? []).length, expectedSections.length - 1);
+  assert.equal((markup.match(/class="setup-accordion-panel-clip"/gu) ?? []).length, expectedSections.length);
+  assert.equal((markup.match(/class="setup-accordion-panel-inner"/gu) ?? []).length, expectedSections.length);
+  assert.match(source, /import \{ setSetupAccordionPanelExpanded \} from "\.\/setup-accordion-motion\.js";/u);
+  assert.match(source, /const trigger = query\(`#setup-trigger-\$\{id\}`\);[\s\S]*?const wasOpen = trigger instanceof HTMLButtonElement/u);
+  assert.match(source, /panelChanges\.push\(\[panel, isOpen\]\)[\s\S]*?focusTarget\?\.focus\(\);[\s\S]*?panelChanges\.forEach/u);
+  assert.match(motionSource, /const panelTransitions = new WeakMap\(\);/u);
+  assert.match(motionSource, /clearPanelTransition\(panel\);/u);
+  assert.match(motionSource, /panel\.hidden = false;[\s\S]*panel\.getBoundingClientRect\(\);/u);
+  assert.match(motionSource, /panel\.inert = !expanded;/u);
+  assert.match(motionSource, /event\.propertyName === "grid-template-rows"/u);
+  assert.match(motionSource, /window\.setTimeout\(finish, SETUP_ACCORDION_MOTION_MS \+ SETUP_ACCORDION_SETTLE_BUFFER_MS\)/u);
+  assert.match(motionSource, /current\.finish !== finish/u);
+  assert.match(motionSource, /if \(prefersReducedMotion\(\)\) \{\s*settlePanel\(panel, expanded\);/u);
+  assert.match(css, /\.setup-accordion-panel\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*1fr;[\s\S]*?transition:[\s\S]*?grid-template-rows/u);
+  assert.match(css, /\.setup-accordion-panel\[data-motion-state="closed"\],[\s\S]*?grid-template-rows:\s*0fr;[\s\S]*?opacity:\s*0;/u);
+  assert.match(css, /\.setup-accordion-panel-clip\s*\{[\s\S]*?min-height:\s*0;/u);
+  assert.match(css, /data-motion-state="closing"\] \.setup-accordion-panel-clip[\s\S]*?overflow:\s*clip;/u);
+  assert.match(css, /data-motion-state="opening"\],[\s\S]*?data-motion-state="closing"\][\s\S]*?will-change:\s*grid-template-rows, opacity;/u);
+});
+
+test("each owner, including Preview, requires acceptance before the final save", async () => {
+  const markup = renderResearchUiMarkup("browser", "ledger");
+  const source = await read("experiment-planner/web/src/research/app.js");
+  const confirmable = ["workspace", "questionnaires", "stimuli", "layout", "feedback", "xr"];
+  assert.equal((markup.match(/class="setup-section-confirmation"/gu) ?? []).length, 7);
+  assert.equal((markup.match(/data-confirm-section=/gu) ?? []).length, 6);
+  assert.equal((markup.match(/id="package-generate"/gu) ?? []).length, 1);
+  assert.ok(markup.includes("0 of 6 confirmations · 7 ledger layers"));
+  assert.match(markup, /id="package-generate"[\s\S]*?>Save final JSON…<\/button>/u);
+  assert.match(markup, /data-confirm-section="feedback"[\s\S]*?>Confirm preview<\/button>/u);
+  assert.doesNotMatch(markup, /data-confirm-section="review"/u);
+  assert.match(markup, /data-section-review-check="feedback"/u);
+  for (const id of confirmable) {
+    const tag = markup.match(new RegExp(`<button\\b(?=[^>]*data-confirm-section="${id}")[^>]*>`, "u"))?.[0];
+    assert.ok(tag, id);
+    assert.match(tag, /type="button"/u);
+    assert.ok(tag.includes(`aria-describedby="setup-confirmation-status-${id}"`));
+  }
+  assert.match(source, /await setupConfirmationFlow\.confirm\(sectionId\)/u);
+  assert.match(source, /if \(transition\.status !== "confirmed"\) return/u);
+  assert.match(source, /setupNavigationRevision !== navigationRevision/u);
+  assert.match(source, /openSetupSection\(transition\.nextSectionId, \{ focus: true \}\)/u);
+  assert.match(source, /save\.phase === "saved" && !packageIsStale/u);
+  assert.match(source, /save\.saved !== observedSuccessfulSave[\s\S]*?if \(openSection === "review"\)[\s\S]*?query\("#setup-trigger-review"\)\?\.focus\(\)/u);
+  assert.match(source, /setupConfirmationFlow\.destroy\(\)/u);
+  const navigation = source.slice(source.indexOf("function openSetupSection("), source.indexOf("async function confirmSetupSection("));
+  assert.doesNotMatch(navigation, /reviewedSetupSections|\.accept\(|\.confirm\(/u);
+});
+
+test("both app surfaces end every ledger page with one confirmation or final-save footer", () => {
+  for (const surface of ["browser", "tauri"]) {
+    const markup = renderResearchUiMarkup(surface, "ledger");
+    for (const [index, { id }] of SETUP_SECTIONS.entries()) {
+      const start = markup.indexOf(`id="setup-panel-${id}"`);
+      const footer = markup.indexOf('class="setup-section-confirmation"', start);
+      const nextId = SETUP_SECTIONS[index + 1]?.id;
+      const end = nextId ? markup.indexOf(`data-setup-section="${nextId}"`, footer) : markup.indexOf('<nav class="ledger-rail"', footer);
+      assert.ok(start >= 0 && footer > start && end > footer, `${surface}/${id}: footer exists`);
+      const panel = markup.slice(start, end);
+      const action = id === "review" ? 'id="package-generate"' : `data-confirm-section="${id}"`;
+      assert.ok(panel.includes(action));
+    }
+    assert.match(markup, /id="preview-window-open"[^>]*>Show Flubber settings<\/button>/u);
+    assert.match(markup, /id="flubber-window-open"[^>]*>Show Flubber preview<\/button>/u);
+    assert.match(markup, /data-ledger-feedback-authority hidden/u);
+    assert.match(markup, /id="ledger-feedback-window-title">Flubber</u);
+  }
+});
+
+test("the Flubber companion owns its visible dialogs and interactive color map", async () => {
+  const markup = renderResearchUiMarkup("browser", "ledger");
+  const appSource = await read("experiment-planner/web/src/research/app.js");
+  const companionSource = await read("experiment-planner/web/src/research/preview-window-entry.js");
+  const css = await read("experiment-planner/web/research.css");
+  const ledgerEnd = markup.indexOf('<nav class="ledger-rail"');
+  const authority = markup.indexOf("data-ledger-feedback-authority");
+  assert.ok(authority > ledgerEnd, "the hidden JSON authority stays outside the ledger object");
+  assert.match(appSource, /dialog\.show\(\)/u);
+  assert.match(companionSource, /createInlineColorPicker\(content\.querySelector\("#preview-color-picker"\)/u);
+  assert.match(companionSource, /input\.dispatchEvent\(new Event\("input", \{ bubbles: true \}\)\)/u);
+  assert.match(css, /data-planner-interface="ledger"\][\s\S]*?#binding-capture-dialog,[\s\S]*?#preview-color-dialog[\s\S]*?visibility:\s*hidden;/u);
+});
+
+test("both Planner surfaces use the canonical Ledger controls", () => {
+  for (const surface of ["browser", "tauri"]) {
+    const markup = renderResearchUiMarkup(surface);
+    assert.match(markup, /data-planner-interface="ledger"/u);
+    assert.doesNotMatch(markup, /data-setup-resizer|class="feedback-navigation-trigger"/u);
+    assert.match(markup, /class="ledger-rail"/u);
+    assert.equal((markup.match(/data-confirm-section=/gu) ?? []).length, 6);
+    assert.equal((markup.match(/id="package-generate"/gu) ?? []).length, 1);
+    assert.equal((markup.match(/id="preview-window-open"/gu) ?? []).length, 1);
+  }
+});
+
+test("Ledger uses its own desktop chrome and browser layout", () => {
+  const desktopLedger = renderResearchUiMarkup("tauri");
+  const browserLedger = renderResearchUiMarkup("browser");
+  const desktopChrome = desktopLedger.slice(0, desktopLedger.indexOf("<main>"));
+  const browserChrome = browserLedger.slice(0, browserLedger.indexOf("<main>"));
+
+  assert.match(desktopChrome, /<header class="app-bar ledger-window-bar" data-tauri-drag-region="deep" aria-label="Window drag area"><\/header>/u);
+  assert.doesNotMatch(browserChrome, /class="app-bar/u);
+  for (const chrome of [desktopChrome, browserChrome]) {
+    assert.doesNotMatch(chrome, /0\.4\.0-alpha\.1|Setting Up the Experiment|(?:Tauri desktop|Desktop Chrome \/ Edge) adapter|· Ledger/u);
+  }
+});
+
+test("the ledger keeps Secret Tunnel's flat sheet geometry without decorative glow", async () => {
+  const [css, icons] = await Promise.all([
+    read("experiment-planner/web/research.css"),
+    read("experiment-planner/web/assets/ledger-tab-icons.svg"),
+  ]);
+  const markup = renderResearchUiMarkup("tauri", "ledger");
+  assert.match(css, /\.ledger-rail\s*\{[\s\S]*?flex-direction:\s*column;[\s\S]*?padding:\s*0;[\s\S]*?pointer-events:\s*none;/u);
+  assert.match(css, /\.ledger-tab\s*\{[\s\S]*?flex:\s*1 1 0;[\s\S]*?container-type:\s*size;|\.ledger-tab\s*\{[\s\S]*?container-type:\s*size;[\s\S]*?flex:\s*1 1 0;/u);
+  assert.match(css, /width:\s*min\(34cqh, 45cqw\)/u);
+  assert.match(css, /background:\s*hsl\(var\(--ledger-tab-hue\) 34% 13\.5%\)/u);
+  assert.equal((css.match(/\.ledger-tab:nth-child\(\d\)\s*\{\s*--ledger-tab-hue:/gu) ?? []).length, SETUP_SECTIONS.length);
+  assert.equal((icons.match(/<symbol id="ledger-[^"]+"/gu) ?? []).length, SETUP_SECTIONS.length);
+  for (const { id } of SETUP_SECTIONS) assert.match(icons, new RegExp(`<symbol id="ledger-${id}"`, "u"));
+  assert.match(css, /\.ledger-tab-icon\s*\{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*100%;[\s\S]*?stroke:\s*currentcolor;/u);
+  assert.doesNotMatch(markup, /style="--ledger-(?:page|tab)-hue:/u);
+  const withoutSheetShadows = css
+    .replace("box-shadow: 1px 2px 3px rgb(0 0 0 / 45%);", "")
+    .replace("box-shadow: 1px 2px 4px rgb(0 0 0 / 50%);", "");
+  assert.doesNotMatch(withoutSheetShadows, /box-shadow:/u);
+});
+
+test("the desktop Ledger uses Secret Tunnel's transparent custom window silhouette", async () => {
+  const [css, desktopEntry, nativeEntry, nativeSource, capabilitySource, ledgerIcon] = await Promise.all([
+    read("experiment-planner/web/research.css"),
+    read("experiment-planner/desktop/index.html"),
+    read("experiment-planner/web/src/research/native-entry.js"),
+    read("native/src/lib.rs"),
+    read("native/capabilities/research.json"),
+    read("experiment-planner/web/assets/affect-planner-ledger-icon.svg"),
+  ]);
+  const desktop = renderResearchUiMarkup("tauri", "ledger");
+  const browser = renderResearchUiMarkup("browser", "ledger");
+  assert.match(desktopEntry, /<html lang="en" data-ledger-window>/u);
+  assert.match(desktop, /data-native-window-minimize/u);
+  assert.match(desktop, /data-native-window-maximize/u);
+  assert.match(desktop, /data-native-window-close/u);
+  assert.equal((desktop.match(/data-native-window-resize=/gu) ?? []).length, 8);
+  assert.match(desktop, /data-tauri-drag-region="deep"/u);
+  assert.doesNotMatch(browser, /data-native-window-(?:minimize|maximize|close|resize)/u);
+  assert.match(css, /html\[data-ledger-window\] \.research-shell\[data-planner-interface="ledger"\]::before\s*\{[\s\S]*?inset:\s*0 56px 0 0;[\s\S]*?border-radius:\s*12px 0 0 12px;/u);
+  assert.match(css, /\.ledger-tab\s*\{[\s\S]*?width:\s*50px;[\s\S]*?border-left:\s*0;[\s\S]*?border-radius:\s*0 9px 9px 0;/u);
+  assert.match(css, /html\[data-ledger-window\] #research-app\[data-planner-interface="ledger"\] \.ledger-rail\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?inset:\s*0 0 0 auto;[\s\S]*?height:\s*100dvh;/u);
+  assert.match(nativeEntry, /getCurrentWindow[\s\S]*?currentWindow\.minimize\(\)[\s\S]*?currentWindow\.toggleMaximize\(\)[\s\S]*?currentWindow\.close\(\)[\s\S]*?currentWindow\.startResizeDragging/u);
+  assert.match(nativeSource, /window\.decorations = false;[\s\S]*?window\.transparent = true;[\s\S]*?window\.min_width = Some\(640\.0\);[\s\S]*?window\.min_height = Some\(480\.0\);/u);
+  assert.doesNotMatch(nativeSource, /--ledger|ledger\.html/u);
+  assert.match(nativeSource, /LEDGER_WINDOW_ICON[\s\S]*?parent\.set_icon/u);
+  assert.match(ledgerIcon, /<title id="title">Experiment Planner Ledger<\/title>[\s\S]*?single angled ledger panel seen from the side[\s\S]*?four-color Flubber affect mark/u);
+  assert.match(ledgerIcon, /fill="#65708a"[\s\S]*?fill="#f7f4eb"/u);
+  assert.match(ledgerIcon, /<path id="flubber-shape" d="M512 184[^"]+"\/>/u);
+  assert.match(ledgerIcon, /<g transform="matrix\([^"]+\)">\s*<g clip-path="url\(#flubber-clip\)">/u);
+  for (const color of ["#f1c562", "#69d8ac", "#8096ef", "#ef7d88"]) assert.ok(ledgerIcon.includes(color));
+  assert.doesNotMatch(ledgerIcon, /<(?:linearGradient|radialGradient|filter)\b/u);
+  const permissions = JSON.parse(capabilitySource).permissions;
+  for (const permission of [
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging",
+    "core:window:allow-toggle-maximize",
+  ]) {
+    assert.ok(permissions.includes(permission));
+  }
+});
+
+test("Section 2 uses multilingual questionnaire tables and hides backend documents", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  const editor = await read("experiment-planner/web/src/research/questionnaire-editor.js");
+  const markup = renderResearchUiMarkup();
+  const sectionStart = markup.indexOf('id="setup-panel-questionnaires"');
+  const sectionEnd = markup.indexOf('data-setup-section="stimuli"', sectionStart);
+  const section = markup.slice(sectionStart, sectionEnd);
+  for (const id of [
+    "study-language-add", "study-language-add-button", "study-language-list",
+    "questionnaire-add-blank", "questionnaire-sheet-list", "questionnaire-sheet-file",
+    "questionnaire-sheet-preview", "questionnaire-coverage-status",
+  ]) assert.ok(section.includes(`id="${id}"`), id);
+  for (const id of ["questionnaire-prebuilt-open", "questionnaire-prebuilt-dialog", "questionnaire-prebuilt-list", "questionnaire-sheet-copy"]) assert.ok(section.includes(`id="${id}"`));
+  assert.doesNotMatch(section, /data-questionnaire-preset/u);
+  for (const retired of ["questionnaire-file-input", "questionnaire-preview-dialog", "questionnaire-inspiration-dialog", "questionnaire-definition-list", "questionnaire-module-list"]) {
+    assert.ok(!markup.includes(`id="${retired}"`), `Retired questionnaire surface: ${retired}`);
+  }
+  assert.doesNotMatch(section, /phencon|inspiration|questionnaire-module-list|protocol-plan-hash|sourceSha256/u);
+  assert.match(section, /id="questionnaire-survey-json"/u);
+  assert.match(section, /Import SurveyJS questionnaire/u);
+  assert.match(section, /Paste items, answer labels and recorded values together from Excel/u);
+  assert.match(section, /before the video task/u);
+  assert.match(editor, /event\.clipboardData\.getData\("text\/plain"\)/u);
+  assert.doesNotMatch(editor, /navigator\.clipboard|document\.execCommand/u);
+  assert.match(editor, /data-sheet-cell/u);
+  assert.match(editor, /data-sheet-repeat/u);
+  assert.match(editor, /data-sheet-required/u);
+  assert.match(source, /questionnaireEditor\.pendingKeys\(\)/u);
+  assert.match(source, /requestQuestionnaireAssetStorage\(root, payload\)/u);
+  assert.match(source, /createCoveredFlatLanguageSelectionV1/u);
+  assert.doesNotMatch(source, /questionnaires\/tas-20-en\.csv/u);
+  assert.equal((markup.match(/data-mode-panel=/gu) ?? []).length, 2);
+});
+
+test("Workspace keeps primary actions visible and secondary tools behind one disclosure", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  const markup = renderResearchUiMarkup();
+  const workspacePanelStart = markup.indexOf('id="setup-panel-workspace"');
+  const workspacePanelEnd = markup.indexOf('data-setup-section="questionnaires"', workspacePanelStart);
+  assert.ok(workspacePanelStart >= 0 && workspacePanelEnd > workspacePanelStart, "the workspace accordion panel must be independently inspectable");
+  const workspacePanel = markup.slice(workspacePanelStart, workspacePanelEnd);
+
+  assert.deepEqual(
+    [...workspacePanel.matchAll(/data-workspace-location="([^"]+)"/gu)].map((match) => match[1]),
+    ["workspaceRoot"],
+    "the Ledger only needs to display the selected root",
+  );
+  assert.equal((workspacePanel.match(/id="workspace-choose"/gu) ?? []).length, 1);
+  assert.match(workspacePanel, /<button id="workspace-choose"[^>]*>Set work directory<\/button>/u);
+
+  assert.doesNotMatch(workspacePanel, /data-open-workspace-location=/u);
+  assert.match(workspacePanel, /id="package-load"[^>]*>Load JSON<\/button>/u);
+  assert.match(workspacePanel, /<details class="workspace-extra-actions"><summary>More actions<\/summary>/u);
+  assert.match(workspacePanel, /id="workspace-status"[^>]*><\/p>/u);
+  for (const id of ["experiment-id", "experiment-title"]) {
+    assert.equal((workspacePanel.match(new RegExp(`id="${id}"`, "gu")) ?? []).length, 1);
+    assert.doesNotMatch(workspacePanel, new RegExp(`id="${id}"[^>]*readonly`, "u"));
+  }
+  assert.doesNotMatch(markup, /id="setup-panel-experiment"/u);
+  assert.match(workspacePanel, /id="experiment-id"[^>]*value="video-affect-study"/u);
+  assert.match(workspacePanel, /id="experiment-title"[^>]*value="Video Affect Study"/u);
+  for (const obsoleteWorkspaceStructure of [
+    /class="[^"]*\bdirectory-list\b/u,
+    /class="[^"]*\bprotocol-import-card\b/u,
+    /id="settings-load"/u,
+    /id="settings-save"/u,
+  ]) assert.doesNotMatch(workspacePanel, obsoleteWorkspaceStructure);
+  for (const id of ["video-drop-zone", "stimulus-library-table", "video-import", "video-folder-import", "workspace-rescan"]) {
+    assert.equal((workspacePanel.match(new RegExp(`id="${id}"`, "gu")) ?? []).length, 1);
+    assert.equal((markup.match(new RegExp(`id="${id}"`, "gu")) ?? []).length, 1);
+  }
+  assert.doesNotMatch(workspacePanel, /data-open-section="stimuli"[^>]*>Manage videos</u);
+  const stimuliPanelStart = markup.indexOf('id="setup-panel-stimuli"');
+  const stimuliPanelEnd = markup.indexOf('data-setup-section="layout"', stimuliPanelStart);
+  const stimuliPanel = markup.slice(stimuliPanelStart, stimuliPanelEnd);
+  assert.doesNotMatch(stimuliPanel, /id="(?:video-drop-zone|stimulus-library-table|video-import|video-folder-import|workspace-rescan)"/u);
+
+  for (const id of ["workspace-choose", "workspace-rescan", "video-import", "video-folder-import", "package-load", "package-generate", "package-file-status", "experiment-load", "experiment-template-download", "experiment-file-status", "settings-load", "settings-save"]) {
+    assert.match(markup, new RegExp(`id="${id}"`, "u"));
+  }
+  for (const id of [
+    "package-reproduction-status",
+    "choose-participant-language", "participant-language-dialog",
+    "participant-language-context", "participant-language-breadcrumb",
+    "participant-language-prompt", "participant-language-options",
+    "participant-language-back", "participant-language-cancel",
+  ]) {
+    assert.match(markup, new RegExp(`id="${id}"`, "u"));
+  }
+  assert.doesNotMatch(markup, /id="package-language-tree"/u);
+  assert.doesNotMatch(markup, /id="package-language-route"/u);
+  assert.doesNotMatch(markup, /id="package-file-input"/u);
+  assert.match(source, /openSupportedBrowserPlannerRecipeFile\(\{ \.\.\.options, rootHandle: workspace\?\.rootHandle \}\)/u);
+  assert.match(source, /documentAdapter: \{\s*parseDocument: parseSupportedPlannerRecipe/u);
+  assert.match(source, /openLegacy: applyExperimentPackageReceipt/u);
+  assert.match(source, /packageSaveDialog\.request\(parsed\.canonicalSourceText/u);
+  assert.match(source, /workspace\.attestExperimentPackageRoot/u);
+  assert.match(source, /const catalogue = await workspace\.rescanPackageVideos\(\)/u);
+  assert.match(source, /const importedPaths = await workspace\.importVideoFiles\(files\)[\s\S]*?const relativePath = `stimuli\/\$\{importedPaths\[index\]\}`/u);
+  assert.match(source, /if \(target\.id === "video-import"\) requestVideoImport\(\)/u);
+  assert.match(source, /if \(target\.id === "video-folder-import"\) requestVideoImport\(\{ directory: true \}\)/u);
+  assert.match(source, /const dropZone = query\("#video-drop-zone"\)/u);
+  assert.match(source, /const canOpen = surface === "tauri" && capabilities\.directoryPermission/u);
+  assert.match(source, /root\.addEventListener\(RESEARCH_UI_EVENTS\.workspaceReady, event => projectWorkspaceReady\(event\.detail\)\)/u);
+  assert.match(source, /function projectWorkspaceReady\(detail\)[\s\S]*?refreshWorkspaceLocationButtons\(\);/u);
+  assert.match(source, /directoryPermission \? "ready" : "warning"/u);
+  assert.match(source, /Work directory access is unavailable\. Restore access or select it again\./u);
+  assert.match(markup, /Package reproduction matrix/u);
+  assert.match(source, /loadedLanguageSelection = structuredClone\(parsed\.package\.languageSelection\)/u);
+  assert.match(source, /const flat = createCoveredFlatLanguageSelectionV1/u);
+  assert.match(source, /reconcileQuestionnaireModuleMappings\(loadedLanguageSelection/u);
+  assert.match(source, /resolveLanguageSelectionTraversalStepV1/u);
+  assert.match(source, /validateExperimentPackageRecoveryBindingV1/u);
+  assert.match(source, /participantRecoveryBindings/u);
+  assert.match(source, /No language was selected/u);
+  assert.doesNotMatch(source, /routes\[0\]/u);
+  assert.doesNotMatch(source, /questionnaireModuleIds = questionnaireModules\.filter/u);
+  assert.match(markup, /Folders are scanned recursively/u);
+  assert.match(markup, /Prepare randomization outside Affect Research/u);
+  assert.match(markup, /supplies every participant’s block order, complete-video order, and the ISI after each video/u);
+  assert.match(markup, /Array order is authoritative/u);
+  assert.match(markup, /id="sampling-frequency"[^>]*min="1"[^>]*max="240"[^>]*value="130"/u);
+  assert.doesNotMatch(markup, /id="experiment-(?:id|title)"[^>]*readonly/u);
+  assert.match(markup, /id="participant-count"[^>]*readonly/u);
+  assert.match(markup, /Continuous rating is always enabled/u);
+  assert.match(markup, /id="acquisition-window"[\s\S]*?value="fullAttempt" selected/u);
+  assert.doesNotMatch(markup, /id="(?:continuous-rating|single-summary-rating)"/u);
+  assert.match(markup, /Stimulus Presentation Order/u);
+  assert.match(markup, /Participant allocation belongs to the experiment runner/u);
+  assert.match(markup, /Durations range from 0 to 3,600,000 ms/u);
+  assert.match(markup, /one video annotation or one ISI name/u);
+  assert.match(markup, /Download Excel/u);
+  assert.doesNotMatch(markup, /Williams counterbalancing|Cyclic rotation|balanced-v1|name="transitionMode"/u);
+});
+
+test("Workspace retains the accessible local stimulus inspiration catalogue in secondary actions", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  const markup = renderResearchUiMarkup();
+  assert.ok(markup.indexOf('id="stimulus-inspiration-open"') > markup.indexOf('id="video-import"'));
+  assert.match(markup, /id="stimulus-inspiration-open"[^>]*aria-haspopup="dialog"[^>]*aria-controls="stimulus-inspiration-dialog"[^>]*>Stimulus inspiration<\/button>/u);
+  assert.match(markup, /<dialog id="stimulus-inspiration-dialog"[^>]*aria-labelledby="stimulus-inspiration-title"[^>]*aria-describedby=/u);
+  for (const category of ["Video", "Audio", "Vignette"]) {
+    assert.match(markup, new RegExp(`>${category}<\\/h3>`, "u"));
+  }
+  for (const sourceName of ["CAAV", "OpenLAV", "Emo-FilM / LIRIS-ACCEDE", "CASE", "DEAM", "Emo-Soundscapes", "IDEST", "SENDv1"]) {
+    assert.match(markup, new RegExp(`>${sourceName.replaceAll("/", "\\/")}<`, "u"));
+  }
+  assert.equal((markup.match(/DOI: /gu) ?? []).length, 8);
+  assert.equal((markup.match(/>Official source/gu) ?? []).length, 8);
+  assert.match(markup, /nothing is downloaded or added to this experiment/u);
+  assert.match(markup, /induced or felt valence–arousal is the closest validation target/u);
+  assert.match(markup, /Perceived or expressed emotion is complementary, not equivalent/u);
+  assert.match(markup, /revalidate anything edited, concatenated, translated, narrated, or synthesized/u);
+  assert.match(markup, /<form method="dialog" class="dialog-actions">/u);
+  assert.match(source, /target\.id === "stimulus-inspiration-open"[\s\S]*dialog\.showModal\(\)/u);
+  assert.equal((markup.match(/data-mode-panel=/gu) ?? []).length, 2);
+});
+
+test("participant language is explicit per attempt and recovery cannot reroute it", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  const markup = renderResearchUiMarkup();
+  assert.match(markup, /<dialog id="participant-language-dialog"[^>]*aria-labelledby="participant-language-title"/u);
+  assert.match(markup, /<fieldset class="participant-language-fieldset">/u);
+  assert.match(markup, /id="participant-language-error"[^>]*role="alert"/u);
+  assert.match(source, /function openParticipantLanguageDialog\(\)[\s\S]*selectedAttemptDisposition\(\) === "resume-compatible"[\s\S]*cannot be rerouted/u);
+  assert.match(source, /dataset\.languageOption = option\.optionId/u);
+  assert.match(source, /function validateRecoveryLanguageBinding\(binding\)[\s\S]*canonicalSourceByteSha256[\s\S]*packageDefinitionSha256[\s\S]*stale or invalid language route/u);
+  assert.match(source, /compiled\.assignmentSha256 !== expectedRecoveryBinding\.assignmentSha256/u);
+  assert.match(source, /RESEARCH_UI_EVENTS\.runStarted[\s\S]*clearParticipantLanguageSelection\(\)[\s\S]*setMode\("run"\)/u);
+  assert.match(source, /RESEARCH_UI_EVENTS\.startRejected[\s\S]*clearParticipantLanguageSelection\(\)[\s\S]*schedulePlanRefresh\(\)/u);
+  assert.match(source, /participant-language-cancel[\s\S]*clearParticipantLanguageSelection\(\)[\s\S]*Start remains blocked/u);
+  assert.doesNotMatch(source, /routes\[0\]|package-language-route/u);
+});
+
+test("all nine input presets, custom capture, conflict guidance, and live test are exposed", () => {
+  assert.deepEqual(INPUT_PRESET_OPTIONS.map(({ label }) => label), [
+    "Arrow keys",
+    "WASD",
+    "IJKL",
+    "Numeric keypad",
+    "Pointer / trackpad grid",
+    "Mouse buttons and wheel",
+    "Gamepad D-pad",
+    "Gamepad left stick",
+    "Gamepad right stick",
+  ]);
+  const markup = renderResearchUiMarkup();
+  for (const { id, label } of INPUT_PRESET_OPTIONS) {
+    assert.match(markup, new RegExp(`<option value="${id}">${label.replace("/", "\\/")}</option>`, "u"));
+  }
+  assert.match(markup, /id="input-step-size"[^>]*value="0\.1"/u);
+  assert.match(markup, /Response control sets movement and hold behavior/u);
+  assert.match(markup, /operating-system repeat is ignored/u);
+  assert.match(markup, /captured action cannot be assigned twice/u);
+  assert.match(markup, /id="binding-capture-dialog"/u);
+  assert.match(markup, /id="input-test"/u);
+});
+
+test("visual feedback has independent Grid and Flubber controls and one color owner", () => {
+  const markup = renderResearchUiMarkup();
+  for (const id of [
+    "visual-grid-visible", "visual-flubber-visible", "visual-size", "visual-transparency",
+    "visual-hide-feedback", "visual-lock-position", "visual-position-x", "visual-position-y",
+    "flubber-outline-visible", "flubber-outline-thickness", "flubber-halo-visible",
+    "grid-line-thickness", "grid-outline-visible", "grid-outline-thickness", "grid-cursor-size",
+  ]) assert.match(markup, new RegExp(`id="${id}"`, "u"));
+  assert.match(markup, /id="visual-size" type="number"/u);
+  assert.equal((markup.match(/id="color-halo"/gu) ?? []).length, 1);
+  assert.equal((markup.match(/id="color-halo-hex"/gu) ?? []).length, 1);
+  assert.doesNotMatch(markup, /id="flubber-halo-color"/u);
+  for (const anchor of ["up", "down", "left", "right", "idle", "outline", "halo", "cursor"]) {
+    assert.match(markup, new RegExp(`id="color-${anchor}"`, "u"));
+    assert.match(markup, new RegExp(`id="color-${anchor}-hex"`, "u"));
+    if (["up", "down", "left", "right"].includes(anchor)) {
+      assert.match(markup, new RegExp(`id="color-${anchor}-hex" type="hidden"`, "u"));
+      assert.doesNotMatch(markup, new RegExp(`data-color-reset="${anchor}"`, "u"));
+    } else {
+      assert.match(markup, new RegExp(`data-color-reset="${anchor}"`, "u"));
+    }
+  }
+  assert.match(markup, /id="main-gradient-canvas"/u);
+  assert.equal((markup.match(/data-color-anchor=/gu) ?? []).length, 4);
+  assert.match(markup, /Acquisition continues while Grid and Flubber are hidden/u);
+  assert.match(markup, /sole control for disabling drag/u);
+});
+
+test("preview startup resolves legacy state before projecting release controls", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  const renderStart = source.indexOf("function renderPreviewDesignControls()");
+  const renderEnd = source.indexOf("function projectDesignPreview()", renderStart);
+  const renderer = source.slice(renderStart, renderEnd);
+  assert.ok(renderer.indexOf("const legacy = feedbackSettingsVersion === 1") < renderer.indexOf("releaseButton.disabled = legacy"));
+});
+
+test("Advanced contains the exact LSL fields and six mapping disclosures", () => {
+  const markup = renderResearchUiMarkup();
+  for (const id of ["lsl-enabled", "lsl-state-stream", "lsl-stream-type", "lsl-marker-stream", "lsl-source-id"]) {
+    assert.match(markup, new RegExp(`id="${id}"`, "u"));
+  }
+  assert.deepEqual(MAPPING_FIELDS.map(({ label, allowedMin, allowedMax, min, max, driver, reverse }) => ({
+    label, allowedMin, allowedMax, min, max, driver, reverse,
+  })), [
+    { label: "Oscillation Frequency", allowedMin: 0, allowedMax: 10, min: 0.5, max: 2.5, driver: "y-axis", reverse: false },
+    { label: "Edge Smoothness", allowedMin: 0, allowedMax: 1, min: 0, max: 1, driver: "x-axis", reverse: false },
+    { label: "Projection Amplitude", allowedMin: 0, allowedMax: 1, min: 0.2, max: 0.4, driver: "y-axis", reverse: false },
+    { label: "Pulse Synchrony", allowedMin: 0, allowedMax: 1, min: 0.2, max: 1, driver: "x-axis", reverse: false },
+    { label: "Wave-size Variation", allowedMin: 0, allowedMax: 1, min: 0, max: 0.8, driver: "x-axis", reverse: true },
+    { label: "Saturation", allowedMin: 0, allowedMax: 1, min: 0, max: 1, driver: "radius", reverse: false },
+  ]);
+  assert.equal((markup.match(/class="inner-disclosure mapping-disclosure"/gu) ?? []).length, 6);
+  for (const driver of ["x-axis", "y-axis", "angle", "radius"]) assert.match(markup, new RegExp(`<option value="${driver}"`, "u"));
+});
+
+test("Review and Export carries privacy, participant-state, format, and fail-closed controls", () => {
+  const markup = renderResearchUiMarkup();
+  assert.match(markup, /Availability and recovery/u);
+  assert.match(markup, /Availability and recovery are read from saved attempts/u);
+  for (const id of ["participant-first-name", "participant-last-name", "participant-age", "participant-gender", "participant-handedness", "participant-code"]) {
+    assert.match(markup, new RegExp(`id="${id}"`, "u"));
+  }
+  assert.match(markup, /id="participant-count"[^>]*max="100000"/u);
+  assert.match(markup, /id="participant-window-previous"/u);
+  assert.match(markup, /id="participant-window-next"/u);
+  assert.deepEqual(ATTEMPT_DISPOSITIONS, ["resume-compatible", "new-attempt"]);
+  for (const disposition of ATTEMPT_DISPOSITIONS) assert.match(markup, new RegExp(`name="attemptDisposition" value="${disposition}"`, "u"));
+  assert.match(markup, /id="participant-rerun-confirm"/u);
+  assert.match(markup, /Resume compatible partial/u);
+  assert.match(markup, /Start a new attempt/u);
+  assert.equal(normalizeAttemptDisposition("partial", "resume-compatible"), "resume-compatible");
+  assert.equal(normalizeAttemptDisposition("partial", "new-attempt"), "new-attempt");
+  assert.equal(normalizeAttemptDisposition("complete", "resume-compatible"), "new-attempt");
+  assert.equal(normalizeAttemptDisposition("available", "resume-compatible"), "new-attempt");
+  for (const option of ["Woman", "Man", "Non-binary", "Self-described", "Prefer not to say", "Left", "Right", "Ambidextrous"]) {
+    assert.match(markup, new RegExp(`>${option}<`, "u"));
+  }
+  assert.match(markup, /Raw names[^<]*removed before Start/u);
+  assert.match(markup, /id="output-csv"[^>]*checked/u);
+  assert.match(markup, /id="output-tsv"/u);
+  assert.match(markup, /id="start-experiment"[^>]*disabled/u);
+  for (const id of ["settings-hash", "review-plan-hash", "storage-estimate", "timing-capability", "native-playback-mode", "native-media-capability", "lsl-capability"]) {
+    assert.match(markup, new RegExp(`id="${id}"`, "u"));
+  }
+  assert.match(markup, /HTML video \/ WebView · lightweight runner/u);
+});
+
+test("Run has mutually exclusive questionnaire and stimulus stages with bounded controls", () => {
+  const markup = renderResearchUiMarkup();
+  const run = markup.slice(markup.indexOf('<section class="run-mode"'), markup.indexOf("</main>"));
+  assert.ok(run.indexOf('class="stimulus-stage"') < run.indexOf('class="run-feedback-stage"'));
+  for (const id of ["run-native-video-host", "run-video", "run-pause", "run-stop-early", "run-stimulus-status", "run-timing-status", "run-write-status", "run-lsl-status", "run-transition", "run-continue", "run-questionnaire-stage", "run-questionnaire-form", "run-questionnaire-previous", "run-questionnaire-next", "run-questionnaire-submit"]) {
+    assert.match(run, new RegExp(`id="${id}"`, "u"));
+  }
+  assert.match(run, /id="run-pause"[^>]*hidden disabled/u,
+    "Pause is unavailable until the authoritative runtime reports an active video");
+  for (const setupOnly of ["experiment-id", "participant-count", "input-preset", "visual-size", "lsl-enabled", "start-experiment"]) {
+    assert.doesNotMatch(run, new RegExp(`id="${setupOnly}"`, "u"));
+  }
+  assert.match(run, /Configured adjacent visual feedback/u);
+  assert.match(run, /preflighted complete video/u);
+  assert.match(run, /Sampling is stopped and the rating is neutral/u);
+  assert.match(markup, /controlled stop finalizes an explicitly partial result and cannot be resumed/u);
+});
+
+test("Run input routing is enabled only by authoritative active-stimulus status", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  assert.match(source, /typeof detail\.ratingInputActive === "boolean"\) ratingInputEnabled = detail\.ratingInputActive/u);
+  assert.match(source, /mode === "run" && ratingInputEnabled && !activeQuestionnaire/u,
+    "questionnaire arrow-key navigation must not be routed into affect bindings");
+  assert.match(source, /pause\.hidden = !detail\.pauseAvailable/u);
+  assert.match(source, /pause\.disabled = !detail\.pauseAvailable/u);
+});
+
+test("external experiment plan export uses the canonical source-identity and ISI serializer", async () => {
+  const [source, view] = await Promise.all([
+    read("experiment-planner/web/src/research/app.js"),
+    read("experiment-planner/web/src/research/ui-view.js"),
+  ]);
+  assert.match(source, /import \{ externalExperimentPlanToCsv \} from "\.\/tabular\.js"/u);
+  assert.match(source, /csv = await externalExperimentPlanToCsv\(plan\)/u);
+  assert.doesNotMatch(view, /id="assignment-preview"/u);
+  assert.doesNotMatch(source, /assignmentPlanToCsv\(plan\)/u);
+});
+
+test("the UI bridge names are explicit and stable", () => {
+  assert.deepEqual(RESEARCH_UI_EVENTS, {
+    stimulusAuthoringRequest: "affect-research:stimulus-authoring-request",
+    videoLibraryChanged: "affect-research:video-library-changed",
+    selectWorkspaceRequest: "affect-research:select-workspace",
+    openWorkspaceLocationRequest: "affect-research:open-workspace-location",
+    rescanWorkspaceRequest: "affect-research:rescan-workspace",
+    importVideosRequest: "affect-research:import-videos-request",
+    loadSettingsRequest: "affect-research:load-settings-request",
+    loadExperimentRequest: "affect-research:load-experiment-request",
+    loadExperimentPackageRequest: "affect-research:load-experiment-package-request",
+    saveExperimentPackageRequest: "affect-research:save-experiment-package-request",
+    saveSettingsRequest: "affect-research:save-settings-request",
+    exportPlanRequest: "affect-research:export-plan-request",
+    importQuestionnaireRequest: "affect-research:import-questionnaire-request",
+    storeQuestionnaireAssetRequest: "affect-research:store-questionnaire-asset-request",
+    questionnaireDraftRequest: "affect-research:questionnaire-draft-request",
+    questionnaireSubmitRequest: "affect-research:questionnaire-submit-request",
+    planReady: "affect-research:plan-ready",
+    setupSettingsReady: "affect-research:setup-settings-ready",
+    inputTestState: "affect-research:input-test-state",
+    inputEdge: "affect-research:input-edge",
+    inputBindingChanged: "affect-research:input-binding-changed",
+    inputTestReset: "affect-research:input-test-reset",
+    inputCaptureRequest: "affect-research:input-capture-request",
+    inputCaptureCancel: "affect-research:input-capture-cancel",
+    startRequest: "affect-research:start-request",
+    startRejected: "affect-research:start-rejected",
+    pauseRequest: "affect-research:pause-request",
+    stopEarlyRequest: "affect-research:stop-early-request",
+    continueRequest: "affect-research:continue-request",
+    settingsLoaded: "affect-research:settings-loaded",
+    experimentLoaded: "affect-research:experiment-loaded",
+    experimentPackageLoaded: "affect-research:experiment-package-loaded",
+    capabilityStatus: "affect-research:capability-status",
+    workspaceReady: "affect-research:workspace-ready",
+    stimuliCatalogued: "affect-research:stimuli-catalogued",
+    participantStates: "affect-research:participant-states",
+    runStarted: "affect-research:run-started",
+    runStatus: "affect-research:run-status",
+    questionnaireStatus: "affect-research:questionnaire-status",
+    runComplete: "affect-research:run-complete",
+  });
+});
+
+test("Start emits an explicit attempt disposition without raw participant names", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  assert.match(source, /attemptDisposition,/u);
+  assert.match(source, /rerunConfirmed,/u);
+  assert.match(source, /setInputValue\("participant-first-name", ""\)/u);
+  assert.match(source, /setInputValue\("participant-last-name", ""\)/u);
+  const detailBlock = source.slice(source.indexOf("const detail = {"), source.indexOf("const event = new CustomEvent", source.indexOf("const detail = {")));
+  for (const field of [
+    "experimentPackageSourceText",
+    "experimentPackageSourceByteSha256",
+    "experimentPackageDefinitionSha256",
+    "experimentPackageId",
+    "selectedLanguageId",
+    "languageSelectionPath",
+    "packageAssignmentSha256",
+    "packageAssetBindings",
+  ]) {
+    assert.match(detailBlock, new RegExp(`${field}:?`, "u"));
+  }
+  assert.doesNotMatch(detailBlock, /firstName|lastName/u);
+});
+
+test("pending native finalization has an explicit acquisition-free Setup dispatch", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  assert.match(source, /__finalizationPending/u);
+  assert.match(source, /__finalizationBinding/u);
+  assert.match(source, /function selectedPendingFinalization\(\)[\s\S]*protocolContract = experimentPackageDocument[\s\S]*\? "manifestV4"[\s\S]*\? "manifestV3"[\s\S]*: "manifestV2"[\s\S]*expectedSettingsSha256 = protocolContract === "manifestV2" \? settingsHash : protocolSettingsHash[\s\S]*binding\.protocolContract !== protocolContract[\s\S]*binding\.settingsSha256 !== expectedSettingsSha256[\s\S]*binding\.assignmentPlanSha256 !== plan\.planHashSha256/u);
+  assert.match(source, /Finalize pending \$\{pendingFinalization\.completionStatus\} attempt/u);
+  const requestStart = source.slice(
+    source.indexOf("function requestStart()"),
+    source.indexOf("root.addEventListener(\"click\"", source.indexOf("function requestStart()")),
+  );
+  const recoveryBranch = requestStart.slice(0, requestStart.indexOf("const fieldsValid"));
+  assert.match(recoveryBranch, /recoveryFinalizationOnly: true/u);
+  assert.match(recoveryBranch, /pendingFinalizationAttemptNumber: pendingFinalization\.attemptNumber/u);
+  assert.match(recoveryBranch, /pendingFinalizationCompletionStatus: pendingFinalization\.completionStatus/u);
+  assert.match(recoveryBranch, /participantId: selectedParticipant/u);
+  assert.match(recoveryBranch, /settingsSha256: settingsHash/u);
+  assert.doesNotMatch(recoveryBranch, /deriveParticipantRecord|inputTestReceiptId|verifiedStimulusIds|storageReady|timingWorkerReady/u);
+});
+
+test("manifest readiness is fail-closed and the adapter exposes authoritative neutral reset", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  assert.match(source, /manifestReady: false/u);
+  assert.match(source, /capabilities\.manifestReady \? "pass" : "block"/u);
+  assert.match(source, /manifestReady: capabilities\.manifestReady/u);
+  assert.match(source, /resetAffect\(reason = "safe-boundary"\)/u);
+  assert.match(source, /inputController\.resetNeutral\(reason\)/u);
+  assert.match(source, /representative WebView frames attested \(unqualified playback\)/u);
+  assert.match(source, /installed-hardware qualification pending/u);
+  assert.equal((source.match(/new CustomEvent\(RESEARCH_UI_EVENTS\.workspaceReady/gu) ?? []).length, 2, "selection and permission renewal both request a manifest rescan");
+  for (const event of ["pointerup", "pointercancel", "lostpointercapture"]) {
+    assert.match(source, new RegExp(`runFeedbackStage\\?\\.addEventListener\\("${event}", handleRunPointer\\)`, "u"));
+  }
+});
+
+test("preview normalization is bounded, deterministic, and uses Research defaults", () => {
+  assert.deepEqual(DEFAULT_COLORS, {
+    up: "#f2c94c", down: "#2f80ed", left: "#eb5757", right: "#27ae60",
+    idle: "#9ca3af", outline: "#f8fafc", halo: "#93c5fd", cursor: "#ffffff",
+  });
+  const state = normalizePreviewState({
+    x: 4,
+    y: -4,
+    sizePercent: 999,
+    transparencyPercent: -2,
+    position: { x: -1, y: 2 },
+    flubber: { outlineThickness: 99 },
+    grid: { lineThickness: 0, outlineThickness: 99, cursorSize: 0 },
+    colors: { halo: "invalid" },
+  });
+  assert.equal(state.x, 1);
+  assert.equal(state.y, -1);
+  assert.equal(state.sizePercent, 100);
+  assert.equal(state.transparencyPercent, 0);
+  assert.deepEqual(state.position, { x: 0, y: 1 });
+  assert.equal(state.flubber.outlineThickness, 20);
+  assert.equal(state.grid.lineThickness, 0.25);
+  assert.equal(state.grid.outlineThickness, 20);
+  assert.equal(state.grid.cursorSize, 2);
+  assert.equal(state.colors.halo, DEFAULT_COLORS.halo);
+  assert.equal(formatCoordinate(0), "+0.000");
+  assert.equal(formatCoordinate(-2), "-1.000");
+});
+
+test("all six Flubber mapping outputs materially control the renderer", () => {
+  const profiles = createProfiles(64, 8);
+  const offsets = createProjectionOffsets("research-renderer-contract", 8);
+  const render = (overrides = {}) => buildFlubberPath({
+    profiles,
+    offsets,
+    x: 0.6,
+    y: 0.4,
+    phase: 1.25,
+    palette: DEFAULT_COLORS,
+    projectionAmplitude: 0.3,
+    edgeSmoothness: 0.5,
+    pulseSynchrony: 0.6,
+    amplitudeVariation: 0.4,
+    colorSaturation: 0.5,
+    ...overrides,
+  });
+  const baseline = render();
+  assert.notEqual(render({ projectionAmplitude: 0.8 }).path, baseline.path);
+  assert.notEqual(render({ edgeSmoothness: 0 }).path, baseline.path);
+  assert.notEqual(render({ pulseSynchrony: 1 }).path, baseline.path);
+  assert.notEqual(render({ amplitudeVariation: 0 }).path, baseline.path);
+  assert.notEqual(render({ colorSaturation: 1 }).color, baseline.color);
+  assert.notEqual(render({ phase: 1.75 }).path, baseline.path);
+  assert.equal(affectPaletteColor(1, 0, DEFAULT_COLORS, 0), "rgb(183 183 183)");
+});
+
+test("programmatic binding, color, and overlay changes invalidate the frozen protocol", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  assert.match(source, /function applyDesignPreviewPosition\(position\)[\s\S]*?refreshProjection\(\);\s*schedulePlanRefresh\(\);/u);
+  assert.match(source, /function resetBindingsToPreset\(\)[\s\S]*?resetInputTest\(\);[\s\S]*?renderBindings\(\);\s*schedulePlanRefresh\(\);/u);
+  assert.match(source, /inputBinding = structuredClone\(result\.binding\);\s*resetInputTest\(\{ notify: false \}\);[\s\S]*?renderBindings\(\);\s*schedulePlanRefresh\(\);/u);
+  assert.match(source, /function applyNormalizedResearchSettings\(normalized, \{[\s\S]*?applyFeedbackFields\(\{ input: normalized\.input, visual: normalized\.visual, mappings: normalized\.advanced\.mappings \}\);/u);
+  assert.match(source, /function applyFeedbackFields\(normalized\)[\s\S]*?inputBinding = structuredClone\(normalized\.input\);[\s\S]*?resetInputTest\(\);/u);
+  assert.match(source, /if \(target\.dataset\.colorReset\)[\s\S]*?refreshProjection\(\);\s*schedulePlanRefresh\(\);/u);
+  assert.match(source, /function schedulePlanRefresh\(\)[\s\S]*?settingsSnapshot = null;[\s\S]*?plan = null;[\s\S]*?capabilities\.manifestReady = false;/u);
+});
+
+test("the prototype and desktop entrypoints load only the shared Research instrument", async () => {
+  const [siteIndex, desktopIndex, browserEntry, nativeEntry, bootstrap, packageSource, serveSource] = await Promise.all([
+    read("experiment-planner/web/research.html"),
+    read("experiment-planner/desktop/index.html"),
+    read("experiment-planner/web/src/research/browser-entry.js"),
+    read("experiment-planner/web/src/research/native-entry.js"),
+    read("experiment-planner/web/src/research/ui-bootstrap.js"),
+    read("package.json"),
+    read("scripts/serve-site.mjs"),
+  ]);
+  assert.match(siteIndex, /id="research-app" data-research-surface="browser"/u);
+  assert.match(siteIndex, /src="\.\/src\/research\/browser-entry\.js"/u);
+  assert.match(siteIndex, /href="\.\/research\.css\?v=0\.4\.0-alpha\.1"/u);
+  assert.match(desktopIndex, /id="research-app" data-research-surface="tauri"/u);
+  assert.match(desktopIndex, /src="\.\.\/web\/src\/research\/native-entry\.js"/u);
+  assert.match(desktopIndex, /href="\.\.\/web\/research\.css\?v=0\.4\.0-alpha\.1"/u);
+  assert.match(browserEntry, /initializeRuntime: bootRuntimeBridge/u);
+  assert.match(nativeEntry, /initializeRuntime: bootNativeBridge/u);
+  assert.equal((bootstrap.match(/DOMContentLoaded/gu) ?? []).length, 1);
+  assert.match(bootstrap, /bootResearchUi\(\{ surface, showFlubber, showPreview \}\)[\s\S]*await initializeRuntime\(root\)/u);
+  assert.match(packageSource, /"serve": "node scripts\/serve-site\.mjs"/u);
+  assert.match(serveSource, /"\.json": "application\/json; charset=utf-8"/u);
+  for (const html of [siteIndex, desktopIndex]) {
+    assert.equal((html.match(/<script/gu) ?? []).length, 1);
+    assert.doesNotMatch(html, /(?:webxr|party|ground-control|polar|face-|touch-playground|vdo\.ninja)/iu);
+  }
+});
+
+test("the Research stylesheet passes the compact Uncodixfy guardrails", async () => {
+  const css = await read("experiment-planner/web/research.css");
+  assert.doesNotMatch(css, /(?:linear|radial|conic)-gradient\s*\(/iu);
+  assert.doesNotMatch(css, /backdrop-filter|text-transform|letter-spacing/iu);
+  const withoutSheetShadows = css
+    .replace("box-shadow: 1px 2px 3px rgb(0 0 0 / 45%);", "")
+    .replace("box-shadow: 1px 2px 4px rgb(0 0 0 / 50%);", "");
+  assert.doesNotMatch(withoutSheetShadows, /box-shadow:/u);
+  assert.doesNotMatch(css, /\.(?:hero|eyebrow|glass|pill|dashboard-card)\b/iu);
+  const compactCss = css.replace("border-radius: 12px 0 0 12px;", "");
+  for (const match of compactCss.matchAll(/border-radius:\s*([\d.]+)px/gu)) {
+    assert.ok(Number(match[1]) <= 8, `border radius ${match[1]}px exceeds the compact UI limit`);
+  }
+  assert.match(css, /:focus-visible/u);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/u);
+  assert.match(css, /@media \(max-width: 759px\)/u);
+  assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 56px/u);
+});
+
+test("the open ledger page fits bounded boxes without any scrollbar dependency", async () => {
+  const css = await read("experiment-planner/web/research.css");
+  assert.match(css, /\.research-shell\s*>\s*main\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*minmax\(0, 1fr\);[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;/u);
+  assert.match(css, /\.setup-mode\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*minmax\(0, 1fr\);[\s\S]*?height:\s*100%;/u);
+  assert.match(css, /\.setup-layout\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?height:\s*100%;/u);
+  assert.match(css, /\.ledger-page \.setup-accordion-panel-clip\s*\{[\s\S]*?height:\s*100%;[\s\S]*?overflow:\s*hidden;/u);
+  assert.match(css, /\.ledger-page-flow\s*\{[\s\S]*?container:\s*ledger-page-flow \/ size;[\s\S]*?overflow:\s*hidden;/u);
+  assert.match(css, /\[data-ledger-page-hidden\]\s*\{[\s\S]*?display:\s*none !important;/u);
+  assert.match(css, /@media \(max-width: 759px\)[\s\S]*?\.research-shell\s*\{[\s\S]*?grid-template-rows:\s*auto auto;[\s\S]*?min-height:\s*100dvh;/u);
+  assert.match(css, /@media \(max-width: 759px\)[\s\S]*?\.research-shell\s*>\s*main\s*\{[\s\S]*?display:\s*block;[\s\S]*?overflow:\s*visible;/u);
+  assert.match(css, /\.ledger-page-stack\s*\{[\s\S]*?grid-template-rows:\s*minmax\(0, 1fr\);/u);
+  assert.match(css, /\.ledger-page\s*\{[\s\S]*?pointer-events:\s*none;[\s\S]*?\.ledger-page \.setup-accordion-panel:not\(\[inert\]\)\s*\{\s*pointer-events:\s*auto;/u);
+  assert.match(css, /@media \(max-width: 479px\)[\s\S]*?\.workspace-location-row\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);[\s\S]*?\.workspace-location-actions\s*\{[\s\S]*?justify-content:\s*flex-start;/u);
+  assert.match(css, /\.table-scroll\s*\{[\s\S]*?max-width:\s*100%;[\s\S]*?overflow:\s*auto;/u);
+  assert.match(css, /data-planner-interface="ledger"[\s\S]*?\.ledger-page-flow :is\([\s\S]*?\.table-scroll,[\s\S]*?\.participant-grid,[\s\S]*?\.planned-events[\s\S]*?overflow:\s*visible !important;/u);
+  assert.match(css, /data-planner-interface="ledger"[\s\S]*?\.ledger-page-flow textarea\s*\{[\s\S]*?overflow:\s*hidden !important;[\s\S]*?resize:\s*none;/u);
+  assert.match(css, /\.video-location-id\s*\{[\s\S]*?white-space:\s*nowrap;[\s\S]*?user-select:\s*text;/u);
+  const source = await read("experiment-planner/web/src/research/app.js");
+  const layoutSource = await read("experiment-planner/web/src/research/ledger-page-layout.js");
+  assert.match(source, /createLedgerPageLayout\(root\)/u);
+  assert.match(layoutSource, /fitSingleItem\(flow, current\)/u);
+  assert.match(layoutSource, /textarea\.style\.height = "0px";[\s\S]*?textarea\.scrollHeight/u);
+  assert.match(layoutSource, /section\.dataset\.ledgerPageScale = scale\.toFixed\(4\)/u);
+  assert.match(source, /title\.className = "video-location-id";[\s\S]*?title\.textContent = stimulus\.title;[\s\S]*?title\.title = stimulus\.title;/u);
+  assert.match(source, /source === "workspace"[\s\S]*?videoAnnotationIdFromRelativePathV1\(String\(location\)\)/u);
+});
+
+test("authored ISI deadlines use a monotonic clock while wall time remains metadata-only", async () => {
+  const runtime = await read("experiment-planner/web/src/research/runtime-bridge.js");
+  assert.match(runtime, /intervalEndsAt = this\.run\.intervalPausedForVisibility[\s\S]*?this\.monotonicNow\(\) \+ interval\.durationMs/u);
+  assert.match(runtime, /intervalEndsAt \?\? 0\) - this\.monotonicNow\(\)/u);
+  assert.match(runtime, /intervalRemainingMs = remainingMs/u,
+    "visibility loss freezes the remaining monotonic interval instead of consuming hidden time");
+  for (const match of runtime.matchAll(/const transitionStartedAt = this\.(\w+)\(\)/gu)) {
+    assert.equal(match[1], "monotonicNow");
+  }
+  const intervalBranch = runtime.slice(
+    runtime.indexOf('if (step.kind === "interval")'),
+    runtime.indexOf("this.run.questionnaireActive = false", runtime.indexOf('if (step.kind === "interval")') + 1),
+  );
+  assert.doesNotMatch(intervalBranch, /epochNow/u);
+});
+
+test("custom research controls expose one coherent accessible interaction model", async () => {
+  const [markup, source, preview, css] = await Promise.all([
+    Promise.resolve(renderResearchUiMarkup("browser")),
+    read("experiment-planner/web/src/research/app.js"),
+    read("experiment-planner/web/src/research/preview.js"),
+    read("experiment-planner/web/research.css"),
+  ]);
+  assert.match(markup, /id="video-drop-zone"[^>]*role="group"/u);
+  assert.doesNotMatch(markup, /id="video-drop-zone"[^>]*(?:tabindex|role="button")/u);
+  assert.doesNotMatch(markup, /role="application"/u);
+  assert.match(markup, /id="participant-grid"[^>]*role="radiogroup"/u);
+  assert.match(source, /button\.setAttribute\("role", "radio"\);[\s\S]*?button\.setAttribute\("aria-checked"/u);
+  assert.doesNotMatch(source, /button\.setAttribute\("aria-selected"/u);
+  assert.match(markup, /data-color-reset="halo" aria-label="Reset Halo color"/u);
+  assert.match(markup, /aria-label="Oscillation Frequency minimum \(Hz\)"/u);
+  assert.match(markup, /id="run-video"[^>]*aria-label="Protocol-controlled current stimulus video"/u);
+  assert.match(source, /syncControlValidation[\s\S]*?aria-invalid[\s\S]*?aria-errormessage/u);
+  assert.match(source, /queueMicrotask\(\(\) => proceed\.focus\(\)\)/u);
+  assert.doesNotMatch(preview, /addEventListener\("keydown"/u);
+  assert.match(css, /@media \(forced-colors: active\)/u);
+});
+
+test("Run feedback projection owns its visible coordinate receipt as well as the stage", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  assert.match(source, /createResearchPreview\(root\.querySelector\('\[data-mode-panel="run"\]'\)/u);
+  assert.doesNotMatch(source, /createResearchPreview\(root\.querySelector\("\.run-feedback-stage"\)/u);
+});
+
+
+test("Segment 3 prepares variants while Segment 1 owns verified media and the registry owns confirmation", async () => {
+  const markup = renderResearchUiMarkup();
+  const start = markup.indexOf('data-setup-section="stimuli"');
+  const section = markup.slice(start, markup.indexOf('data-setup-section="layout"', start));
+  for (const id of ["stimulus-order-editor", "stimulus-order-status", "stimulus-order-help", "stimulus-order-versions"]) assert.ok(section.includes(`id="${id}"`));
+  assert.match(section, /data-video-library-export="xlsx"/u);
+  assert.match(section, /data-video-library-export="csv"/u);
+  assert.doesNotMatch(section, /id="assignment-preview"|id="participant-count"|id="video-import"/u);
+  const workspaceStart = markup.indexOf('data-setup-section="workspace"');
+  const workspace = markup.slice(workspaceStart, markup.indexOf('data-setup-section="questionnaires"'));
+  for (const id of ["video-import", "video-folder-import", "workspace-rescan"]) assert.ok(workspace.includes(`id="${id}"`));
+  const source = await read("experiment-planner/web/src/research/app.js");
+  assert.match(source, /await stimulusOrderEditor\.prepareContribution\([\s\S]*?return plannerContributions\.accept\(segment, /u);
+  assert.match(source, /workspaceContributionProducer\.subscribe\(updateStimulusCatalogue\)/u);
+  assert.match(source, /unsubscribeStimulusCatalogue\(\)/u);
+  assert.doesNotMatch(source, /reviewedSetupSections\.delete/u);
+  assert.match(source, /await workspace\.importVideoFiles\(files\)/u);
+  assert.match(source, /if \(target\.id === "workspace-rescan"\) void requestWorkspaceRescan\(\)/u);
+});
+
+test("every asynchronous video catalogue refresh owns a latest-media fence", async () => {
+  const source = await read("experiment-planner/web/src/research/app.js");
+  assert.match(source, /const refreshOperation = \+\+videoCatalogueRefreshGeneration;/u);
+  assert.match(source, /const refreshIsCurrent = \(\) => videoCatalogueRefreshGeneration === refreshOperation;/u);
+  assert.match(source, /const restoreIsCurrent = \(\) => refreshIsCurrent\(\)/u);
+  assert.match(source, /if \(!refreshIsCurrent\(\) \|\| \(pendingRestore && !restoreIsCurrent\(\)\)\)/u);
+});
