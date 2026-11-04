@@ -58,5 +58,7 @@ the whitespace check; scientific source material is not reformatted for a lint.
 PARTIAL overall product readiness: native executable/CLI runtime, real-media
 save/reopen, installers and full accessibility/geometry qualification are NOT RUN.
 No signing, installer publication, website deployment or participant run occurred.
-For-AI structure/safety check passed locally; remote synchronization and CI are
-the remaining extraction publication gates recorded in PROJECT.md.
+For-AI structure/safety check passed with `-RequireRemote`. Private visibility,
+main default, clean Git and actual remote SHA equality were verified for product
+commit `f55b65b6b2a3db698532da06000205910e0d75ee`. [GitHub CI](https://github.com/GeorgeFejer91/experiment-planner-ledger/actions/runs/41825253926) passed for that exact source;
+this handoff changes documentation only. PROJECT.md owns the next product gate.

@@ -44,20 +44,35 @@ Related contracts remain available for compatibility, not additional app scope.
 - [x] Bootstrap a separate repository using the installed For-AI scaffold.
 - [x] Extract the actual ledger interface and matching authoring source.
 - [x] Verify shared domain parity with the sibling, tests and both frontend builds.
-- [ ] Publish privately with reciprocal documentation links and verify remote HEAD.
+- [x] Publish privately with reciprocal documentation links and verify remote HEAD.
 
 Overall product readiness remains open: repository extraction is not an installed
-research-release qualification. Next action: verify private publication and CI, then qualify packaged Planner
-save/reopen and compare both interfaces with real media.
+research-release qualification. Next action: qualify packaged Planner save/reopen with researcher-supplied media
+and compare both interfaces against one identical authored experiment.
 Task state and evidence belong here; do not create a second progress ledger.
 
-## Session observation
+## Session observation — 2026-11-04
 
-2026-11-04: local bootstrap on `codex/extract-planner`; remote publication pending.
-Extraction evidence: 1132 Node tests passed with zero failures/skips;
-SurveyJS checks, browser build, desktop frontend build, Rust formatting and
-locked native checks with all features and no default features passed. Headless
-Chrome at 1280x860 loaded the selected interface with seven sections, no startup
-errors and no participant Run panel. 66 shared authoring modules match the sibling
-byte-for-byte. Installer, actual native CLI execution, save/reopen against real
-media and the full visual/accessibility matrix remain NOT RUN. Read fresh Git state at the next session.
+Extraction task complete. This repository is private at [experiment-planner-ledger](https://github.com/GeorgeFejer91/experiment-planner-ledger),
+default branch `main`, under the canonical `Documents/GitHub/experiment-planner-ledger` folder.
+The last verified product commit is `f55b65b6b2a3db698532da06000205910e0d75ee`; local HEAD and the actual remote
+main ref matched, with a clean tree before this documentation-only handoff.
+[GitHub CI](https://github.com/GeorgeFejer91/experiment-planner-ledger/actions/runs/41825253926) passed frozen install, SurveyJS checks,
+the full extracted Node suite and both frontend builds. The remote-required
+For-AI context/safety check passed. Final handoff documentation is the subsequent
+checkpoint; inspect fresh Git state rather than assuming this observation persists.
+
+Local native checks passed with all features and no default features, and Rust
+formatting passed. Headless Chrome at 1280x860 loaded the selected interface with
+seven sections, no startup errors and no participant Run panel. All 66 checked
+shared authoring modules match the sibling. Five OpenLAV publisher-original
+files retain exact source Git bytes. No video bytes, participant results or
+Runner application are tracked. The source monorepo remains clean and unchanged.
+
+No extraction blocker remains. Overall product/research-release readiness stays
+open. Next acceptance check: create and reopen the same real-media recipe in both
+installed interfaces without setting loss, silent version changes or hidden
+ambient dependencies. Native executable/CLI runtime, real-media save/reopen,
+installer, full accessibility/geometry and Runner session qualification are NOT RUN.
+The repository-creation request authorized this initial private publication;
+future product changes and publication follow matching session authorization.
