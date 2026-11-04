@@ -17,3 +17,12 @@ versions unchanged. Preserve coupled native library modules while removing the
 Runner executable/frontend. Exclude bundled video bytes, local installs/results
 and historical suite packaging. Installer identities are separate by interface;
 packaging stays inactive until qualified. Original monorepo remains unchanged.
+
+## 2026-11-04: Public visibility and collaborator invitation — accepted
+
+The user explicitly requested both interface repositories be public and Antonin
+Fourcade receive access. This supersedes the earlier private-visibility default.
+His exact-name GitHub profile is [afourcade](https://github.com/afourcade).
+Both repositories are PUBLIC; collaborator invitations carry write permission,
+not administrator access. Invitations remain pending until accepted. Existing
+research-data exclusions and publication safeguards continue to apply.

@@ -69,4 +69,7 @@ forever.
 - Commit SHA, branch, remote sync, CI/deployment result.
 - Remaining blocker or next smallest product decision.
 
-The current repository-creation request authorizes the initial private GitHub publication. Later publication requires continuing matching authorization. Use codex/ branches for changes; never force-push.
+The initial request authorized private GitHub publication. The 2026-11-04
+follow-up authorizes public visibility and write-access invitations for Antonin
+Fourcade (`afourcade`). Later publication requires matching authorization.
+Use codex/ branches for changes; never force-push.

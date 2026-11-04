@@ -9,7 +9,7 @@ Compare all shared authoring/recipe modules with the sibling's source: UI
 differences must not change normalized settings, schema dispatch or recipe bytes.
 
 Run `powershell -NoProfile -ExecutionPolicy Bypass -File for-ai/scripts/check-context.ps1 -ProjectRoot . -RequireRemote`
-after publication. Confirm private visibility, main default, clean Git status
+after publication. Confirm public visibility, main default, clean Git status
 and local HEAD equal to the GitHub main ref. Local generated evidence belongs
 in ignored `.for-ai-local/`, not in research data or durable policy.
 
@@ -58,7 +58,13 @@ the whitespace check; scientific source material is not reformatted for a lint.
 PARTIAL overall product readiness: native executable/CLI runtime, real-media
 save/reopen, installers and full accessibility/geometry qualification are NOT RUN.
 No signing, installer publication, website deployment or participant run occurred.
-For-AI structure/safety check passed with `-RequireRemote`. Private visibility,
+For-AI structure/safety check passed with `-RequireRemote`. Initial private visibility,
 main default, clean Git and actual remote SHA equality were verified for product
 commit `f55b65b6b2a3db698532da06000205910e0d75ee`. [GitHub CI](https://github.com/GeorgeFejer91/experiment-planner-ledger/actions/runs/41825253926) passed for that exact source;
 this handoff changes documentation only. PROJECT.md owns the next product gate.
+
+The subsequent access change was verified through GitHub: PUBLIC visibility and
+a pending collaborator invitation for `afourcade` with write permission. All
+local commits were checked for high-confidence secret patterns before exposure;
+none matched. This bounded check is not a complete security audit. Product
+code and its existing test evidence are unchanged.
