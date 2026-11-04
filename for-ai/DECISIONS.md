@@ -26,3 +26,11 @@ His exact-name GitHub profile is [afourcade](https://github.com/afourcade).
 Both repositories are PUBLIC; collaborator invitations carry write permission,
 not administrator access. Invitations remain pending until accepted. Existing
 research-data exclusions and publication safeguards continue to apply.
+
+## 2026-11-04: Link the standalone Runner — accepted
+
+The user's repeat-the-process request created a public
+[Experiment Runner](https://github.com/GeorgeFejer91/experiment-runner) repository.
+Both Planner READMEs and product contracts link to that execution/recording owner;
+Runner links back to both Planners. Authoring scope and saved recipe semantics
+remain unchanged. Cross-repository links do not imply automatic code synchronization.

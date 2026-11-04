@@ -10,7 +10,9 @@ The Planner owns workspaces/media catalogues, questionnaires/languages,
 variants and named intervals, screen layout, feedback/input configuration,
 validation, save and editable reopen. Preview is an authoring simulation.
 Participant allocation, execution, sampling, actual timestamps, LSL/XDF and
-recording belong to a separate Runner. This repository ships no Runner app.
+recording belong to the separate [Experiment Runner](https://github.com/GeorgeFejer91/experiment-runner).
+This repository ships no Runner app. Shared recipe changes must be checked
+against that independently versioned consumer as well as the sibling Planner.
 
 ## Architecture
 

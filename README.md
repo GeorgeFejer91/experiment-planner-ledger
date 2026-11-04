@@ -14,7 +14,7 @@ experiment format. See [extraction provenance](docs/extraction.json).
 - Author languages, questionnaires, demographics and questionnaire assets.
 - Define variants, video order and named interstimulus intervals.
 - Configure screen geometry, feedback placement, Flubber appearance and input.
-- Validate, save and reopen the experiment recipe for a separate Runner.
+- Validate, save and reopen the experiment recipe for [Experiment Runner](https://github.com/GeorgeFejer91/experiment-runner).
 - Use the same authoring owners through the [Planner CLI](docs/planner-cli.md).
 
 Ledger uses ordered planning sheets and separate Flubber preview/settings windows.
@@ -43,7 +43,7 @@ configuration is deliberately inactive pending separate identity/packaging check
 
 ## Boundaries and compatibility
 
-The separate Runner owns participant execution, assignment, timestamps,
+The separate [Experiment Runner](https://github.com/GeorgeFejer91/experiment-runner) owns participant execution, assignment, timestamps,
 acquisition, LSL/XDF and recording. No Runner application is included here.
 Some coupled native library modules remain to preserve the existing Planner
 build; their presence does not expand this project's scope.
